@@ -23,12 +23,23 @@ class AlpacaMarketDataService:
             client_kwargs["base_url"] = settings.base_url
         self._client = StockHistoricalDataClient(**client_kwargs)
         self._data_feed = settings.data_feed
-        self._trading_client = TradingClient(
-            api_key=settings.api_key,
-            secret_key=settings.api_secret,
-            paper=settings.paper_trading,
-            base_url=settings.trading_base_url,
-        )
+
+        trading_kwargs = {
+            "api_key": settings.api_key,
+            "secret_key": settings.api_secret,
+            "paper": settings.paper_trading,
+        }
+        if settings.trading_base_url:
+            trading_kwargs["base_url"] = settings.trading_base_url
+
+        try:
+            self._trading_client = TradingClient(**trading_kwargs)
+        except TypeError:
+            self._trading_client = TradingClient(
+                settings.api_key,
+                settings.api_secret,
+                paper=settings.paper_trading,
+            )
 
     def get_latest_quotes(self, symbols: Iterable[str]) -> Dict[str, Dict[str, Any]]:
         """Fetch latest quote for the provided ticker symbols."""

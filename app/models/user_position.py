@@ -3,7 +3,7 @@ from __future__ import annotations
 from decimal import Decimal
 from typing import Any, Dict, Optional
 
-from pydantic import AliasChoices, BaseModel, ConfigDict, Field
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field, field_validator
 
 
 class UserPosition(BaseModel):
@@ -25,6 +25,13 @@ class UserPosition(BaseModel):
     change_today: Optional[Decimal] = None
 
     model_config = ConfigDict(populate_by_name=True, arbitrary_types_allowed=False)
+
+    @field_validator("asset_id", mode="before")
+    @classmethod
+    def ensure_asset_id_str(cls, value: Any) -> str:
+        if value is None:
+            raise ValueError("asset_id is required")
+        return str(value)
 
     @classmethod
     def from_alpaca(cls, position: Any) -> "UserPosition":
