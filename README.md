@@ -74,3 +74,9 @@ Once running, the API provides:
 
 - Quote availability depends on the data feed tied to your Alpaca plan. Demo accounts usually have access to the `iex` feed.
 - If you need streaming updates, consider using Alpaca's websocket client (`alpaca-py` provides `StockDataStream`), and bridge updates into FastAPI via background tasks or WebSocket endpoints.
+
+## TODO
+
+- 接入国会议员持仓
+- 接入trump
+- 接入polymarket
