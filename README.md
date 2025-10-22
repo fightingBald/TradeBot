@@ -80,3 +80,4 @@ Once running, the API provides:
 - 接入国会议员持仓
 - 接入trump
 - 接入polymarket
+- 接入日历， 避免像是vix交割这种风险
