@@ -81,3 +81,4 @@ Once running, the API provides:
 - 接入trump
 - 接入polymarket
 - 接入日历， 避免像是vix交割这种风险
+- hypeliquid whale API https://docs.coinglass.com/reference/hyperliquid-whale-alert
