@@ -1,0 +1,8 @@
+{
+  "symbols": ["AAPL", "MSFT", "NVDA"],
+  "source": "fmp",
+  "days": 365,
+  "google_insert": true,
+  "google_credentials": "secrets/credentials.json",
+  "google_token": "secrets/token.json"
+}

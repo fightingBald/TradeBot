@@ -136,6 +136,10 @@ celerybeat.pid
 
 # Environments
 .env
+.env.*
+.envrc
+/secrets/
+!/secrets/.gitkeep
 .envrc
 .venv
 env/

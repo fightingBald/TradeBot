@@ -4,12 +4,16 @@
 
 ## 环境准备
 
+> 以下命令均假设在项目根目录执行：`cd /path/to/AlpacaTrading`
+
 1. 准备 Python 虚拟环境并安装仓库依赖：
    ```bash
+   cd /path/to/AlpacaTrading
    pip install -r requirements.txt
    ```
 2. 配置所需数据源的 API Key：
    ```bash
+   cd /path/to/AlpacaTrading
    export FMP_API_KEY=your_fmp_token        # 使用 FMP 数据源
    export FINNHUB_API_KEY=your_finnhub_token  # 使用 Finnhub 数据源
    ```
@@ -18,12 +22,14 @@
 
 运行帮助查看全部参数：
 ```bash
+cd /path/to/AlpacaTrading
 python -m data_sources.earnings_to_calendar --help
 ```
 
 典型拉取命令：
 ```bash
- python -m data_sources.earnings_to_calendar \
+cd /path/to/AlpacaTrading
+python -m data_sources.earnings_to_calendar \
   --symbols=AAPL,MSFT,NVDA \
   --source=fmp \
   --days=90 \
@@ -55,25 +61,44 @@ python -m data_sources.earnings_to_calendar --help
 
 运行时可省略已在配置中声明的选项：
 ```bash
+cd /path/to/AlpacaTrading
 python -m data_sources.earnings_to_calendar --config=./earnings_config.json
 ```
 若命令行提供了相同参数，将优先覆盖配置文件内的数值。
 
+## 使用 `.env` 管理敏感信息
+
+- 把 API Key、Google/iCloud 凭据路径写进项目根目录的 `.env`（已在 `.gitignore` 中），例如：
+  ```
+  FMP_API_KEY=你的FMP密钥
+  GOOGLE_CREDENTIALS_PATH=secrets/credentials.json
+  GOOGLE_TOKEN_PATH=secrets/token.json
+  GOOGLE_INSERT=true
+  ICLOUD_INSERT=false
+  ICLOUD_APPLE_ID=user@icloud.com
+  ICLOUD_APP_PASSWORD=xxxx-xxxx
+  ```
+- 运行命令时会自动读取当前目录的 `.env`；若想指定别的路径，可用 `--env-file=/path/to/.env`。
+- 建议把真实的 `credentials.json` / `token.json` 等敏感文件放在仓库忽略的 `secrets/` 目录（项目已提供 `.gitkeep` 与 `.gitignore`），避免误提交。
+- `.env` 不要提交到仓库；如需共享模板，可参考根目录的 `.env.example`。
+
 ## 如何把财报日程同步到 Google Calendar（大白话版）
 
-1. 到 Google Calendar API 的 Quickstart 页面下载 `credentials.json`，丢在项目根目录（或者你喜欢的路径，后面命令要对应）。
+1. 到 Google Calendar API 的 Quickstart 页面下载 `credentials.json`，放到 `secrets/credentials.json`（或其他安全路径，并在 `.env` / 命令参数里指向该路径）。
 2. 准备好数据源的 API Key，例如：
    ```bash
+   cd /path/to/AlpacaTrading
    export FMP_API_KEY=你的FMP密钥
    ```
 3. 第一次运行命令：
    ```bash
+   cd /path/to/AlpacaTrading
    python -m data_sources.earnings_to_calendar \
      --symbols=AAPL,MSFT,NVDA \
      --source=fmp \
      --google-insert \
-     --google-credentials=credentials.json \
-     --google-token=token.json
+     --google-credentials=secrets/credentials.json \
+     --google-token=secrets/token.json
    ```
    跑起来后会跳浏览器让你授权，授权完会在同目录生成 `token.json`（以后会自动刷新）。
 4. 到 Google Calendar（默认的 primary 日历）里看下有没有新的财报提醒。
@@ -84,14 +109,16 @@ python -m data_sources.earnings_to_calendar --config=./earnings_config.json
      "source": "fmp",
      "days": 90,
      "google_insert": true,
-     "google_credentials": "credentials.json",
-     "google_token": "token.json"
+     "google_credentials": "secrets/credentials.json",
+     "google_token": "secrets/token.json"
    }
    ```
    以后直接：
    ```bash
-   python -m data_sources.earnings_to_calendar --config=earnings_config.json
+   cd 根目录
+   python -m data_sources.earnings_to_calendar --config=./data_sources/earnings_to_calendar/earnings_config.json --env-file=.env --log-level=INFO
    ```
+   （相对路径如 `secrets/credentials.json` 会自动按项目根目录解析，若需要其他位置请使用绝对路径或写成 `../path/to/file`。`--log-level` 支持 `DEBUG|INFO|WARNING|ERROR|CRITICAL`，便于调试请求。）
 6. 想要顺便导出备份？加上 `--export-ics=earnings.ics` 就会多生成一个 ICS 文件。
 
 ## 代码结构

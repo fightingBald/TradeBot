@@ -9,9 +9,12 @@ This project exposes a small FastAPI application that fetches real-time quotes f
 
 ## Setup
 
+> 所有命令默认在项目根目录执行：先 `cd /path/to/AlpacaTrading`。
+
 1. Create and activate a virtual environment.
 2. Install dependencies:
    ```bash
+   cd /path/to/AlpacaTrading
    pip install -r requirements.txt
    ```
 3. Provide your Alpaca credentials, either through environment variables or an `.env` file at the project root. Both the `ALPACA_*` and Alpaca's default `APCA_*` names are supported:
@@ -39,6 +42,7 @@ This project exposes a small FastAPI application that fetches real-time quotes f
 Start the FastAPI app with uvicorn:
 
 ```bash
+cd /path/to/AlpacaTrading
 uvicorn app.main:app --reload
 ```
 
@@ -62,17 +66,20 @@ Once running, the API provides:
 
 - Run the automated test suite with pytest:
   ```bash
+  cd /path/to/AlpacaTrading
   pytest
   ```
 - (Recommended) Lint and format before committing:
   ```bash
+  cd /path/to/AlpacaTrading
   ruff check app tests
   black --check app tests
   ```
 
 ## Data Utilities
 
-- `data_sources/earnings_to_calendar` 提供了一个模块化的 CLI/库，用于从 FMP 或 Finnhub 抓取财报日程并导出到 ICS、Google Calendar 或 iCloud。运行 `python -m data_sources.earnings_to_calendar --help` 查看可用参数，或使用 `--config=path/to/config.json` 统一管理 `symbols`、Google/iCloud 凭据等默认选项。
+- `data_sources/earnings_to_calendar` 提供了一个模块化的 CLI/库，用于从 FMP 或 Finnhub 抓取财报日程并导出到 ICS、Google Calendar 或 iCloud。运行 `python -m data_sources.earnings_to_calendar --help` 查看可用参数，或使用 `--config=path/to/config.json` 统一管理 `symbols`、Google/ICloud 凭据等默认选项。敏感信息建议写在 `.env`（参考 `.env.example`），CLI 会自动加载，也可以用 `--env-file` 指向其他路径。需要调试时可加 `--log-level=DEBUG` 输出详细日志。
+- `notebooks/fmp_data_check.ipynb` 提供交互式示例，可快速验证本地 `FMP_API_KEY` 是否能成功拉取财报数据。
 
 ## Notes
 

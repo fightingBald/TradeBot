@@ -1,10 +1,13 @@
 import json
+import os
 from datetime import date
 from types import SimpleNamespace
+from pathlib import Path
 
 import pytest
 
 from data_sources.earnings_to_calendar import (
+    DEFAULT_LOOKAHEAD_DAYS,
     EarningsEvent,
     FmpEarningsProvider,
     FinnhubEarningsProvider,
@@ -16,6 +19,7 @@ from data_sources.earnings_to_calendar import (
 from data_sources.earnings_to_calendar.cli import (
     _build_runtime_options,
     _load_config,
+    _load_env_file,
 )
 
 
@@ -106,16 +110,49 @@ def test_parse_symbols_normalizes_and_deduplicates(raw, expected):
     assert _parse_symbols(raw.split(",")) == expected
 
 
+def test_load_env_file_populates_environment(tmp_path, monkeypatch):
+    env_file = tmp_path / ".env"
+    env_file.write_text("NEW_VAR=value\nEXISTING=should_not_override\n", encoding="utf-8")
+    monkeypatch.setenv("EXISTING", "keep")
+    monkeypatch.delenv("NEW_VAR", raising=False)
+
+    _load_env_file(str(env_file))
+
+    assert os.environ["NEW_VAR"] == "value"
+    assert os.environ["EXISTING"] == "keep"
+
+
+def test_load_env_file_falls_back_to_search_root(tmp_path, monkeypatch):
+    env_file = tmp_path / "fallback.env"
+    env_file.write_text("FALLBACK_VAR=from_root\n", encoding="utf-8")
+    monkeypatch.delenv("FALLBACK_VAR", raising=False)
+
+    _load_env_file("fallback.env", search_root=tmp_path)
+
+    assert os.environ["FALLBACK_VAR"] == "from_root"
+
+
 def test_load_config_reads_json(tmp_path):
     config_path = tmp_path / "config.json"
     config_path.write_text(json.dumps({"symbols": ["AAPL"]}), encoding="utf-8")
 
-    config = _load_config(str(config_path))
+    config, base = _load_config(str(config_path))
 
+    assert base == config_path.parent
     assert config["symbols"] == ["AAPL"]
 
 
-def test_build_runtime_options_merges_config(tmp_path):
+def test_build_runtime_options_merges_config(tmp_path, monkeypatch):
+    for key in [
+        "GOOGLE_CREDENTIALS_PATH",
+        "GOOGLE_TOKEN_PATH",
+        "GOOGLE_INSERT",
+        "ICLOUD_INSERT",
+        "ICLOUD_APPLE_ID",
+        "ICLOUD_APP_PASSWORD",
+    ]:
+        monkeypatch.delenv(key, raising=False)
+
     config = {
         "symbols": ["AAPL", "MSFT"],
         "source": "finnhub",
@@ -142,7 +179,14 @@ def test_build_runtime_options_merges_config(tmp_path):
         icloud_app_pass=None,
     )
 
-    options = _build_runtime_options(parsed, config)
+    project_root = Path(tmp_path)
+
+    options = _build_runtime_options(
+        parsed,
+        config,
+        config_base=None,
+        project_root=project_root,
+    )
 
     assert isinstance(options, RuntimeOptions)
     assert options.symbols == ["AAPL", "MSFT"]
@@ -150,14 +194,24 @@ def test_build_runtime_options_merges_config(tmp_path):
     assert options.days == 45
     assert options.export_ics == "out.ics"
     assert options.google_insert is True
-    assert options.google_credentials == "cfg_creds.json"
-    assert options.google_token == "cfg_token.json"
+    assert options.google_credentials == str(project_root / "cfg_creds.json")
+    assert options.google_token == str(project_root / "cfg_token.json")
     assert options.icloud_insert is True
     assert options.icloud_id == "user@icloud.com"
     assert options.icloud_app_pass == "abcd-efgh"
 
 
-def test_build_runtime_options_cli_overrides_config():
+def test_build_runtime_options_cli_overrides_config(tmp_path, monkeypatch):
+    for key in [
+        "GOOGLE_CREDENTIALS_PATH",
+        "GOOGLE_TOKEN_PATH",
+        "GOOGLE_INSERT",
+        "ICLOUD_INSERT",
+        "ICLOUD_APPLE_ID",
+        "ICLOUD_APP_PASSWORD",
+    ]:
+        monkeypatch.delenv(key, raising=False)
+
     config = {
         "symbols": ["AAPL"],
         "source": "finnhub",
@@ -178,10 +232,102 @@ def test_build_runtime_options_cli_overrides_config():
         icloud_app_pass=None,
     )
 
-    options = _build_runtime_options(parsed, config)
+    project_root = Path(tmp_path)
+
+    options = _build_runtime_options(
+        parsed,
+        config,
+        config_base=None,
+        project_root=project_root,
+    )
 
     assert options.symbols == ["TSLA", "MSFT"]
     assert options.source == "fmp"
     assert options.days == 10
-    assert options.google_credentials == "cli_creds.json"
+    assert options.google_credentials == str(project_root / "cli_creds.json")
     assert options.google_insert is True
+
+
+def test_build_runtime_options_uses_env_defaults(tmp_path, monkeypatch):
+    monkeypatch.delenv("GOOGLE_CREDENTIALS_PATH", raising=False)
+    monkeypatch.delenv("GOOGLE_TOKEN_PATH", raising=False)
+    monkeypatch.delenv("GOOGLE_INSERT", raising=False)
+    monkeypatch.delenv("ICLOUD_INSERT", raising=False)
+    monkeypatch.delenv("ICLOUD_APPLE_ID", raising=False)
+    monkeypatch.delenv("ICLOUD_APP_PASSWORD", raising=False)
+
+    monkeypatch.setenv("GOOGLE_CREDENTIALS_PATH", "/secrets/credentials.json")
+    monkeypatch.setenv("GOOGLE_TOKEN_PATH", "/secrets/token.json")
+    monkeypatch.setenv("GOOGLE_INSERT", "true")
+    monkeypatch.setenv("ICLOUD_INSERT", "1")
+    monkeypatch.setenv("ICLOUD_APPLE_ID", "user@icloud.com")
+    monkeypatch.setenv("ICLOUD_APP_PASSWORD", "pass-1234")
+
+    parsed = SimpleNamespace(
+        symbols="TSLA",
+        source=None,
+        days=None,
+        export_ics=None,
+        google_insert=False,
+        google_credentials=None,
+        google_token=None,
+        icloud_insert=False,
+        icloud_id=None,
+        icloud_app_pass=None,
+    )
+
+    config_base = Path(tmp_path) / "config_dir"
+    config_base.mkdir()
+
+    options = _build_runtime_options(
+        parsed,
+        {},
+        config_base=config_base,
+        project_root=Path(tmp_path),
+    )
+
+    assert options.symbols == ["TSLA"]
+    assert options.source == "fmp"
+    assert options.days == DEFAULT_LOOKAHEAD_DAYS
+    assert options.google_credentials == str(Path("/secrets/credentials.json"))
+    assert options.google_token == str(Path("/secrets/token.json"))
+    assert options.google_insert is True
+    assert options.icloud_insert is True
+    assert options.icloud_id == "user@icloud.com"
+    assert options.icloud_app_pass == "pass-1234"
+
+
+def test_build_runtime_options_resolves_paths_relative_to_config(tmp_path, monkeypatch):
+    config_base = tmp_path / "cfg"
+    config_base.mkdir()
+    secrets_dir = config_base / "secrets"
+    secrets_dir.mkdir()
+
+    config = {
+        "symbols": ["AAPL"],
+        "google_credentials": "secrets/credentials.json",
+        "google_token": "secrets/token.json",
+    }
+
+    parsed = SimpleNamespace(
+        symbols=None,
+        source=None,
+        days=None,
+        export_ics=None,
+        google_insert=False,
+        google_credentials=None,
+        google_token=None,
+        icloud_insert=False,
+        icloud_id=None,
+        icloud_app_pass=None,
+    )
+
+    options = _build_runtime_options(
+        parsed,
+        config,
+        config_base=config_base,
+        project_root=tmp_path,
+    )
+
+    assert options.google_credentials == str(config_base / "secrets/credentials.json")
+    assert options.google_token == str(config_base / "secrets/token.json")

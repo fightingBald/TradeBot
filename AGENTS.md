@@ -77,13 +77,12 @@
 
 ### 2.3 目录树与变更要求
 
-* **目录树**：在本节粘贴最新 `tree -I 'vendor|node_modules|api/gen'`，或以列表方式维护结构与职责说明。
-* **动态维护**：任何**布局相关**变更都需同步更新本节，并在 PR 描述附迁移说明（包名/导入路径/可执行名/镜像标签变更等）。
-* **校验**：PR CI 应包含 layout 校验脚本（可选）：`scripts/verify_layout.sh` 比对目录变化与本节声明。
 
 当前关键目录：
 - `app/` — FastAPI 服务分层（config/models/services/templates）。
 - `data_sources/earnings_to_calendar/` — 财报日历 CLI 包，包含 `config.py`、`domain.py`、`providers.py`、`calendars.py` 与 `cli.py` 等模块化组件。
+- `secrets/` — 本地敏感凭据存放目录（仅保留 `.gitkeep`，真实文件由 `.gitignore` 忽略）。
+- `notebooks/` — Jupyter Notebook 实验区，用于手动验证数据源或执行探索性分析。
 
 ---
 

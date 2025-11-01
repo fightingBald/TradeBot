@@ -7,8 +7,11 @@ from typing import Callable, Dict, List, Sequence
 
 import requests
 
+from .logging_utils import get_logger
 from .config import DEFAULT_TIMEOUT_SECONDS, USER_AGENT
 from .domain import EarningsEvent, parse_iso_date
+
+logger = get_logger()
 
 
 class EarningsDataProvider:
@@ -49,14 +52,15 @@ class FmpEarningsProvider(EarningsDataProvider):
     ) -> List[EarningsEvent]:
         since_s, until_s = self._format_range(start, end)
         url = (
-            "https://financialmodelingprep.com/api/v3/"
-            f"earning_calendar?from={since_s}&to={until_s}&apikey={self._api_key}"
+            "https://financialmodelingprep.com/stable/earnings-calendar"
+            f"?from={since_s}&to={until_s}&apikey={self._api_key}"
         )
         response = self._http_get(
             url,
             headers={"User-Agent": USER_AGENT},
             timeout=DEFAULT_TIMEOUT_SECONDS,
         )
+        logger.debug("FMP 请求 URL: %s", url)
         response.raise_for_status()
         payload = response.json() or []
         watchlist = {symbol.upper() for symbol in symbols}
@@ -77,6 +81,7 @@ class FmpEarningsProvider(EarningsDataProvider):
                     source=self.source_name,
                 )
             )
+        logger.info("FMP 返回 %d 条事件", len(events))
         return events
 
 
@@ -105,6 +110,7 @@ class FinnhubEarningsProvider(EarningsDataProvider):
             headers={"User-Agent": USER_AGENT},
             timeout=DEFAULT_TIMEOUT_SECONDS,
         )
+        logger.debug("Finnhub 请求 URL: %s", url)
         response.raise_for_status()
         payload = response.json() or {}
         data = payload.get("earningsCalendar", []) or []
@@ -126,6 +132,7 @@ class FinnhubEarningsProvider(EarningsDataProvider):
                     source=self.source_name,
                 )
             )
+        logger.info("Finnhub 返回 %d 条事件", len(events))
         return events
 
 
