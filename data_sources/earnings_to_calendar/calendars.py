@@ -5,9 +5,12 @@ from __future__ import annotations
 import os
 import uuid
 from datetime import datetime, timedelta, timezone
-from typing import Sequence
+from typing import Dict, Optional, Sequence
 
 from .domain import EarningsEvent
+from .logging_utils import get_logger
+
+logger = get_logger()
 
 
 def _ics_escape(text: str) -> str:
@@ -65,12 +68,7 @@ def build_ics(events: Sequence[EarningsEvent], prodid: str = "-//earnings-to-cal
     return "\r\n".join(lines)
 
 
-def google_insert(
-    events: Sequence[EarningsEvent],
-    calendar_id: str = "primary",
-    creds_path: str = "credentials.json",
-    token_path: str = "token.json",
-) -> None:
+def _get_google_service(creds_path: str, token_path: str):
     """
     需要先在 https://developers.google.com/workspace/calendar/api/quickstart/python 按 Quickstart 下载 OAuth credentials.json
     首次运行会打开浏览器授权，令牌保存在 token.json
@@ -93,26 +91,122 @@ def google_insert(
         with open(token_path, "w", encoding="utf-8") as token_file:
             token_file.write(creds.to_json())
 
-    service = build("calendar", "v3", credentials=creds)
+    return build("calendar", "v3", credentials=creds)
+
+
+def _ensure_calendar(
+    service,
+    calendar_id: str | None,
+    calendar_name: str | None,
+    create_if_missing: bool,
+) -> str:
+    if calendar_id:
+        return calendar_id
+
+    if not calendar_name:
+        return "primary"
+
+    calendar_name_lower = calendar_name.lower()
+    page_token: Optional[str] = None
+    while True:
+        response = (
+            service.calendarList()
+            .list(pageToken=page_token, showDeleted=False, maxResults=250)
+            .execute()
+        )
+        for item in response.get("items", []):
+            summary = item.get("summary") or ""
+            if summary.lower() == calendar_name_lower:
+                logger.info("发现现有 Google 日历：%s -> %s", summary, item.get("id"))
+                return item.get("id")
+        page_token = response.get("nextPageToken")
+        if not page_token:
+            break
+
+    if not create_if_missing:
+        raise RuntimeError(f"未找到名为 {calendar_name} 的 Google 日历，且未开启自动创建")
+
+    logger.info("创建新的 Google 日历：%s", calendar_name)
+    created = service.calendars().insert(body={"summary": calendar_name}).execute()
+    return created.get("id")
+
+
+def _earnings_key(event: EarningsEvent) -> str:
+    session = (event.session or "").upper() or "UNSPECIFIED"
+    return f"{event.symbol.upper()}::{event.iso_date}::{session}"
+
+
+def _build_google_event_body(event: EarningsEvent) -> Dict[str, object]:
+    end_date = event.date + timedelta(days=1)
+    key = _earnings_key(event)
+    body: Dict[str, object] = {
+        "summary": event.summary(),
+        "description": event.description(),
+        "start": {"date": event.iso_date},
+        "end": {"date": end_date.strftime("%Y-%m-%d")},
+        "transparency": "transparent",
+        "reminders": {
+            "useDefault": False,
+            "overrides": [
+                {"method": "popup", "minutes": 24 * 60},
+                {"method": "popup", "minutes": 120},
+            ],
+        },
+        "extendedProperties": {
+            "private": {
+                "earnings_key": key,
+                "earnings_symbol": event.symbol.upper(),
+                "earnings_session": (event.session or "").upper(),
+            }
+        },
+    }
+    if event.url:
+        body["source"] = {"title": event.source or "source", "url": event.url}
+    return body
+
+
+def google_insert(
+    events: Sequence[EarningsEvent],
+    calendar_id: str | None = "primary",
+    creds_path: str = "credentials.json",
+    token_path: str = "token.json",
+    *,
+    calendar_name: str | None = None,
+    create_if_missing: bool = False,
+) -> str:
+    """Insert or update earnings events into Google Calendar."""
+
+    service = _get_google_service(creds_path, token_path)
+    target_calendar_id = _ensure_calendar(service, calendar_id, calendar_name, create_if_missing)
+
     for event in events:
-        end_date = event.date + timedelta(days=1)
-        body = {
-            "summary": event.summary(),
-            "description": event.description(),
-            "start": {"date": event.iso_date},
-            "end": {"date": end_date.strftime("%Y-%m-%d")},
-            "transparency": "transparent",
-            "reminders": {
-                "useDefault": False,
-                "overrides": [
-                    {"method": "popup", "minutes": 24 * 60},
-                    {"method": "popup", "minutes": 120},
-                ],
-            },
-        }
-        if event.url:
-            body["source"] = {"title": event.source or "source", "url": event.url}
-        service.events().insert(calendarId=calendar_id, body=body).execute()
+        key = _earnings_key(event)
+        event_body = _build_google_event_body(event)
+
+        existing = (
+            service.events()
+            .list(
+                calendarId=target_calendar_id,
+                privateExtendedProperty=f"earnings_key={key}",
+                singleEvents=True,
+                maxResults=1,
+            )
+            .execute()
+        )
+        items = existing.get("items", [])
+        if items:
+            event_id = items[0]["id"]
+            service.events().update(
+                calendarId=target_calendar_id,
+                eventId=event_id,
+                body=event_body,
+            ).execute()
+            logger.debug("更新 Google Calendar 事件：calendarId=%s eventId=%s key=%s", target_calendar_id, event_id, key)
+        else:
+            service.events().insert(calendarId=target_calendar_id, body=event_body).execute()
+            logger.debug("创建 Google Calendar 事件：calendarId=%s key=%s", target_calendar_id, key)
+
+    return target_calendar_id
 
 
 def icloud_caldav_insert(

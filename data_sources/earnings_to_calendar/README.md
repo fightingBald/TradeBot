@@ -42,11 +42,12 @@ python -m data_sources.earnings_to_calendar \
 - `--days`：查询起止区间（今天起算）天数，默认 120。
 - `--export-ics`：将结果导出为本地 ICS 文件。
 - `--google-insert`：直接写入 Google Calendar，需要 `--google-credentials` 和 `--google-token`。
+- `--google-calendar-id` / `--google-calendar-name`：指定目标日历；未提供时默认使用 `primary`，若只给 name 可配合 `--google-create-calendar` 自动创建。
 - `--icloud-insert`：同步到 iCloud，需提供 `--icloud-id` 与 `--icloud-app-pass`。
 
 ## 配置文件（可选）
 
-命令支持通过 `--config` 指定 JSON 配置文件，集中管理常用参数：
+命令支持通过 `--config` 指定配置文件（默认读取 `config/earnings_to_calendar.toml`）：
 ```json
 {
   "symbols": ["AAPL", "MSFT", "NVDA"],
@@ -55,14 +56,16 @@ python -m data_sources.earnings_to_calendar \
   "google_insert": true,
   "google_credentials": "credentials.json",
   "google_token": "token.json",
-  "icloud_insert": false
+  "google_calendar_name": "Company Earnings",
+  "google_create_calendar": true,
+ "icloud_insert": false
 }
 ```
 
-运行时可省略已在配置中声明的选项：
+运行时可省略已在配置中声明的选项（TOML 支持 `#` 注释，方便按需禁用字段）：
 ```bash
 cd /path/to/AlpacaTrading
-python -m data_sources.earnings_to_calendar --config=./earnings_config.json
+python -m data_sources.earnings_to_calendar --config=config/earnings_to_calendar.toml
 ```
 若命令行提供了相同参数，将优先覆盖配置文件内的数值。
 
@@ -74,6 +77,8 @@ python -m data_sources.earnings_to_calendar --config=./earnings_config.json
   GOOGLE_CREDENTIALS_PATH=secrets/credentials.json
   GOOGLE_TOKEN_PATH=secrets/token.json
   GOOGLE_INSERT=true
+  GOOGLE_CALENDAR_NAME=Company Earnings
+  GOOGLE_CREATE_CALENDAR=true
   ICLOUD_INSERT=false
   ICLOUD_APPLE_ID=user@icloud.com
   ICLOUD_APP_PASSWORD=xxxx-xxxx
@@ -93,32 +98,23 @@ python -m data_sources.earnings_to_calendar --config=./earnings_config.json
 3. 第一次运行命令：
    ```bash
    cd /path/to/AlpacaTrading
-   python -m data_sources.earnings_to_calendar \
-     --symbols=AAPL,MSFT,NVDA \
-     --source=fmp \
-     --google-insert \
-     --google-credentials=secrets/credentials.json \
-     --google-token=secrets/token.json
+  python -m data_sources.earnings_to_calendar \
+    --symbols=AAPL,MSFT,NVDA \
+    --source=fmp \
+    --google-insert \
+    --google-credentials=secrets/credentials.json \
+    --google-token=secrets/token.json \
+    --google-calendar-name="Company Earnings" \
+    --google-create-calendar
    ```
    跑起来后会跳浏览器让你授权，授权完会在同目录生成 `token.json`（以后会自动刷新）。
 4. 到 Google Calendar（默认的 primary 日历）里看下有没有新的财报提醒。
-5. 想要固定配置？写一个 JSON（比如 `earnings_config.json`）：
-   ```json
-   {
-     "symbols": ["AAPL", "MSFT", "NVDA"],
-     "source": "fmp",
-     "days": 90,
-     "google_insert": true,
-     "google_credentials": "secrets/credentials.json",
-     "google_token": "secrets/token.json"
-   }
-   ```
-   以后直接：
+5. 想要固定配置？直接编辑 `config/earnings_to_calendar.toml`（可随时注释/启用字段），以后直接：
    ```bash
-   cd 根目录
-   python -m data_sources.earnings_to_calendar --config=./data_sources/earnings_to_calendar/earnings_config.json --env-file=.env --log-level=INFO
+   cd /path/to/AlpacaTrading
+   python -m data_sources.earnings_to_calendar --config=config/earnings_to_calendar.toml --env-file=.env --log-level=INFO
    ```
-   （相对路径如 `secrets/credentials.json` 会自动按项目根目录解析，若需要其他位置请使用绝对路径或写成 `../path/to/file`。`--log-level` 支持 `DEBUG|INFO|WARNING|ERROR|CRITICAL`，便于调试请求。）
+   （相对路径如 `secrets/credentials.json` 会自动按项目根目录解析，若需要其他位置请使用绝对路径或写成 `../path/to/file`。`--log-level` 支持 `DEBUG|INFO|WARNING|ERROR|CRITICAL`，便于调试请求；如需自动创建并写入指定名称的日历，可配合 `--google-calendar-name` 与 `--google-create-calendar`。）
 6. 想要顺便导出备份？加上 `--export-ics=earnings.ics` 就会多生成一个 ICS 文件。
 
 ## 代码结构

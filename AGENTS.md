@@ -82,6 +82,14 @@
 - `app/` — FastAPI 服务分层（config/models/services/templates）。
 - `data_sources/earnings_to_calendar/` — 财报日历 CLI 包，包含 `config.py`、`domain.py`、`providers.py`、`calendars.py` 与 `cli.py` 等模块化组件。
 - `secrets/` — 本地敏感凭据存放目录（仅保留 `.gitkeep`，真实文件由 `.gitignore` 忽略）。
+- `config/earnings_to_calendar.toml` — CLI 默认配置（TOML，允许注释/覆盖字段）。
+- `notebooks/` — Jupyter Notebook 实验区，用于手动验证数据源或执行探索性分析。
+
+常用环境变量：
+- `FMP_API_KEY` / `FINNHUB_API_KEY`
+- `GOOGLE_CREDENTIALS_PATH` / `GOOGLE_TOKEN_PATH`
+- `GOOGLE_CALENDAR_ID` / `GOOGLE_CALENDAR_NAME` / `GOOGLE_CREATE_CALENDAR`
+- `secrets/` — 本地敏感凭据存放目录（仅保留 `.gitkeep`，真实文件由 `.gitignore` 忽略）。
 - `notebooks/` — Jupyter Notebook 实验区，用于手动验证数据源或执行探索性分析。
 
 ---

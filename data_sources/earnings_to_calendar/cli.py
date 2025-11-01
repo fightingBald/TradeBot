@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import tomllib
 import os
 import sys
 from dataclasses import dataclass
@@ -27,11 +28,13 @@ _DEFAULT_ENV_FILE = ".env"
 _ENV_KEY_GOOGLE_CREDENTIALS = "GOOGLE_CREDENTIALS_PATH"
 _ENV_KEY_GOOGLE_TOKEN = "GOOGLE_TOKEN_PATH"
 _ENV_KEY_GOOGLE_INSERT = "GOOGLE_INSERT"
+_ENV_KEY_GOOGLE_CALENDAR_ID = "GOOGLE_CALENDAR_ID"
+_ENV_KEY_GOOGLE_CALENDAR_NAME = "GOOGLE_CALENDAR_NAME"
+_ENV_KEY_GOOGLE_CREATE_CAL = "GOOGLE_CREATE_CALENDAR"
 _ENV_KEY_ICLOUD_INSERT = "ICLOUD_INSERT"
 _ENV_KEY_ICLOUD_ID = "ICLOUD_APPLE_ID"
 _ENV_KEY_ICLOUD_APP_PASS = "ICLOUD_APP_PASSWORD"
 
-logger = logging.getLogger("earnings_to_calendar")
 logger = get_logger()
 
 
@@ -44,6 +47,9 @@ class RuntimeOptions:
     google_insert: bool
     google_credentials: str
     google_token: str
+    google_calendar_id: str | None
+    google_calendar_name: str | None
+    google_create_calendar: bool
     icloud_insert: bool
     icloud_id: str | None
     icloud_app_pass: str | None
@@ -101,20 +107,34 @@ def _load_env_file(path: str | None, *, search_root: Path | None = None) -> None
     logger.debug("未找到可用的环境变量文件，候选路径：%s", ", ".join(str(c) for c in candidates))
 
 
-def _load_config(config_path: str | None) -> tuple[Dict[str, Any], Path | None]:
-    if not config_path:
+def _load_config(config_path: str | None, default_path: Path | None = None) -> tuple[Dict[str, Any], Path | None]:
+    target_path: Path | None = None
+    if config_path:
+        target_path = Path(config_path)
+    elif default_path and default_path.exists():
+        target_path = default_path
+
+    if target_path is None:
+        logger.debug("未指定配置文件，返回空配置")
         return {}, None
-    cfg_path = Path(config_path)
+
+    cfg_path = target_path
     try:
-        with cfg_path.open("r", encoding="utf-8") as handle:
-            data = json.load(handle)
-            if not isinstance(data, Mapping):
-                raise ValueError("配置文件必须是 JSON 对象")
-            logger.info("已加载配置文件：%s", cfg_path)
-            return dict(data), cfg_path.parent
+        if cfg_path.suffix.lower() == ".toml":
+            with cfg_path.open("rb") as handle:
+                data = tomllib.load(handle)
+        else:
+            with cfg_path.open("r", encoding="utf-8") as handle:
+                data = json.load(handle)
+        if not isinstance(data, Mapping):
+            raise ValueError("配置文件必须是对象/表结构")
+        logger.info("已加载配置文件：%s", cfg_path)
+        return dict(data), cfg_path.parent
     except FileNotFoundError as exc:
         raise RuntimeError(f"找不到配置文件：{config_path}") from exc
     except json.JSONDecodeError as exc:
+        raise RuntimeError(f"配置文件解析失败：{config_path}") from exc
+    except tomllib.TOMLDecodeError as exc:
         raise RuntimeError(f"配置文件解析失败：{config_path}") from exc
 
 
@@ -227,6 +247,38 @@ def _build_runtime_options(
     )
     google_token = _resolve_path(raw_google_token, base=config_base, root=project_root)
 
+    raw_calendar_id = (
+        parsed.google_calendar_id
+        or config.get("google_calendar_id")
+        or os.getenv(_ENV_KEY_GOOGLE_CALENDAR_ID)
+    )
+    google_calendar_id = str(raw_calendar_id) if raw_calendar_id else None
+
+    google_calendar_name = (
+        parsed.google_calendar_name
+        or config.get("google_calendar_name")
+        or os.getenv(_ENV_KEY_GOOGLE_CALENDAR_NAME)
+    )
+    if google_calendar_name:
+        google_calendar_name = str(google_calendar_name)
+
+    if not google_calendar_id and not google_calendar_name:
+        google_calendar_id = "primary"
+
+    if parsed.google_create_calendar:
+        google_create_calendar = True
+    else:
+        config_create_flag = (
+            _coerce_bool(config.get("google_create_calendar"))
+            if "google_create_calendar" in config
+            else None
+        )
+        if config_create_flag is not None:
+            google_create_calendar = config_create_flag
+        else:
+            env_create_flag = _coerce_bool(os.getenv(_ENV_KEY_GOOGLE_CREATE_CAL))
+            google_create_calendar = env_create_flag if env_create_flag is not None else False
+
     if parsed.google_insert:
         google_insert = True
     else:
@@ -264,6 +316,9 @@ def _build_runtime_options(
         google_insert=google_insert,
         google_credentials=str(google_credentials),
         google_token=str(google_token),
+        google_calendar_id=str(google_calendar_id) if google_calendar_id is not None else None,
+        google_calendar_name=google_calendar_name,
+        google_create_calendar=google_create_calendar,
         icloud_insert=icloud_insert,
         icloud_id=str(icloud_id) if icloud_id is not None else None,
         icloud_app_pass=str(icloud_app_pass) if icloud_app_pass is not None else None,
@@ -278,9 +333,12 @@ def main(args: Sequence[str] | None = None) -> None:
     parser.add_argument("--source", choices=list(PROVIDERS.keys()))
     parser.add_argument("--days", type=int)
     parser.add_argument("--export-ics", metavar="PATH", help="Export ICS file")
-    parser.add_argument("--google-insert", action="store_true", help="Insert to Google Calendar (primary)")
+    parser.add_argument("--google-insert", action="store_true", help="Insert events into Google Calendar")
     parser.add_argument("--google-credentials", help="Path to Google OAuth credentials.json")
     parser.add_argument("--google-token", help="Path to stored Google OAuth token.json")
+    parser.add_argument("--google-calendar-id", help="Target Google calendarId (default: primary)")
+    parser.add_argument("--google-calendar-name", help="Target Google calendar name (used when ID missing)")
+    parser.add_argument("--google-create-calendar", action="store_true", help="Create Google Calendar when name not found")
     parser.add_argument("--icloud-insert", action="store_true", help="Insert to iCloud via CalDAV")
     parser.add_argument("--icloud-id")
     parser.add_argument("--icloud-app-pass")
@@ -302,7 +360,8 @@ def main(args: Sequence[str] | None = None) -> None:
 
     _load_env_file(parsed.env_file, search_root=project_root)
 
-    config_data, config_base = _load_config(parsed.config)
+    default_config_path = project_root / "config" / "earnings_to_calendar.toml"
+    config_data, config_base = _load_config(parsed.config, default_path=default_config_path)
 
     try:
         options = _build_runtime_options(
@@ -341,9 +400,23 @@ def main(args: Sequence[str] | None = None) -> None:
         print(f"ICS 已导出：{options.export_ics}")
 
     if options.google_insert:
-        logger.info("写入 Google Calendar：calendarId=primary credentials=%s token=%s", options.google_credentials, options.google_token)
-        google_insert(unique_events, "primary", options.google_credentials, options.google_token)
-        print("已写入 Google Calendar: primary")
+        logger.info(
+            "写入 Google Calendar：calendarId=%s calendarName=%s create_if_missing=%s credentials=%s token=%s",
+            options.google_calendar_id,
+            options.google_calendar_name,
+            options.google_create_calendar,
+            options.google_credentials,
+            options.google_token,
+        )
+        target_calendar_id = google_insert(
+            unique_events,
+            calendar_id=options.google_calendar_id,
+            creds_path=options.google_credentials,
+            token_path=options.google_token,
+            calendar_name=options.google_calendar_name,
+            create_if_missing=options.google_create_calendar,
+        )
+        print(f"已写入 Google Calendar: {target_calendar_id}")
 
     if options.icloud_insert:
         if not (options.icloud_id and options.icloud_app_pass):

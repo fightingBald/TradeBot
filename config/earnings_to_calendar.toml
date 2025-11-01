@@ -1,0 +1,30 @@
+# Earnings → Calendar CLI defaults (TOML)
+
+# 需要抓取的股票列表，可随时注释/调整
+symbols = ["AAPL", "MSFT", "NVDA"]
+
+# 数据来源 (fmp 或 finnhub)
+source = "fmp"
+
+# 查询天数（今天起算），取消注释修改
+days = 90
+
+# 打开写入 Google Calendar（若想关闭，可以注释下面几行）
+google_insert = true
+google_credentials = "secrets/credentials.json"
+google_token = "secrets/token.json"
+
+# 如果已有 calendarId，直接写入即可
+# google_calendar_id = "primary"
+
+# 若希望按名称写入（不存在则自动创建），取消注释
+google_calendar_name = "Company Earnings"
+google_create_calendar = true
+
+# 导出 ICS 备用
+# export_ics = "earnings.ics"
+
+# iCloud CalDAV 参数（按需启用）
+# icloud_insert = true
+# icloud_id = "user@icloud.com"
+# icloud_app_pass = "abcd-efgh"

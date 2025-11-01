@@ -21,6 +21,7 @@ from data_sources.earnings_to_calendar.cli import (
     _load_config,
     _load_env_file,
 )
+import data_sources.earnings_to_calendar.calendars as calendars_mod
 
 
 class StubResponse:
@@ -32,6 +33,91 @@ class StubResponse:
 
     def raise_for_status(self):
         return None
+
+
+class StubExecute:
+    def __init__(self, payload):
+        self._payload = payload
+
+    def execute(self):
+        return self._payload
+
+
+class StubGoogleService:
+    def __init__(self, calendars: dict[str, str] | None = None):
+        self.calendars_data: dict[str, str] = calendars or {}
+        self.events_data: dict[str, list[dict]] = {}
+        self.calendar_inserts: list[dict] = []
+        self.insert_calls: list[tuple[str, dict]] = []
+        self.update_calls: list[tuple[str, str, dict]] = []
+
+    # Calendar list API
+    def calendarList(self):  # noqa: N802 (Google API style)
+        outer = self
+
+        class CalendarList:
+            def list(self, **kwargs):  # noqa: ANN001
+                items = [
+                    {"id": cid, "summary": summary}
+                    for cid, summary in outer.calendars_data.items()
+                ]
+                return StubExecute({"items": items})
+
+        return CalendarList()
+
+    # Calendar management API
+    def calendars(self):  # noqa: N802
+        outer = self
+
+        class Calendars:
+            def insert(self, body):  # noqa: ANN001
+                new_id = f"cal_{len(outer.calendars_data) + 1}"
+                summary = body.get("summary", new_id)
+                outer.calendars_data[new_id] = summary
+                outer.calendar_inserts.append(body)
+                return StubExecute({"id": new_id, "summary": summary})
+
+        return Calendars()
+
+    # Events API
+    def events(self):  # noqa: N802
+        outer = self
+
+        class Events:
+            def list(self, calendarId, privateExtendedProperty, **kwargs):  # noqa: ANN001,N803
+                key = privateExtendedProperty.split("=", 1)[1]
+                matches = [
+                    evt
+                    for evt in outer.events_data.get(calendarId, [])
+                    if evt.get("extendedProperties", {})
+                    .get("private", {})
+                    .get("earnings_key")
+                    == key
+                ]
+                return StubExecute({"items": matches})
+
+            def insert(self, calendarId, body):  # noqa: ANN001,N803
+                body = body.copy()
+                events = outer.events_data.setdefault(calendarId, [])
+                body.setdefault("id", f"evt_{len(events) + 1}")
+                events.append(body)
+                outer.insert_calls.append((calendarId, body))
+                return StubExecute(body)
+
+            def update(self, calendarId, eventId, body):  # noqa: ANN001,N803
+                body = body.copy()
+                body["id"] = eventId
+                events = outer.events_data.setdefault(calendarId, [])
+                for idx, existing in enumerate(events):
+                    if existing.get("id") == eventId:
+                        events[idx] = body
+                        break
+                else:
+                    events.append(body)
+                outer.update_calls.append((calendarId, eventId, body))
+                return StubExecute(body)
+
+        return Events()
 
 
 def test_fmp_provider_filters_and_normalizes():
@@ -136,10 +222,21 @@ def test_load_config_reads_json(tmp_path):
     config_path = tmp_path / "config.json"
     config_path.write_text(json.dumps({"symbols": ["AAPL"]}), encoding="utf-8")
 
-    config, base = _load_config(str(config_path))
+    config, base = _load_config(str(config_path), default_path=None)
 
     assert base == config_path.parent
     assert config["symbols"] == ["AAPL"]
+
+
+def test_load_config_defaults_to_toml(tmp_path):
+    default_path = tmp_path / "config" / "earnings_to_calendar.toml"
+    default_path.parent.mkdir()
+    default_path.write_text("symbols = [\"TSLA\"]\n", encoding="utf-8")
+
+    config, base = _load_config(None, default_path=default_path)
+
+    assert base == default_path.parent
+    assert config["symbols"] == ["TSLA"]
 
 
 def test_build_runtime_options_merges_config(tmp_path, monkeypatch):
@@ -147,6 +244,9 @@ def test_build_runtime_options_merges_config(tmp_path, monkeypatch):
         "GOOGLE_CREDENTIALS_PATH",
         "GOOGLE_TOKEN_PATH",
         "GOOGLE_INSERT",
+        "GOOGLE_CALENDAR_ID",
+        "GOOGLE_CALENDAR_NAME",
+        "GOOGLE_CREATE_CALENDAR",
         "ICLOUD_INSERT",
         "ICLOUD_APPLE_ID",
         "ICLOUD_APP_PASSWORD",
@@ -161,6 +261,8 @@ def test_build_runtime_options_merges_config(tmp_path, monkeypatch):
         "google_insert": True,
         "google_credentials": "cfg_creds.json",
         "google_token": "cfg_token.json",
+        "google_calendar_name": "Company Earnings",
+        "google_create_calendar": True,
         "icloud_insert": True,
         "icloud_id": "user@icloud.com",
         "icloud_app_pass": "abcd-efgh",
@@ -174,6 +276,9 @@ def test_build_runtime_options_merges_config(tmp_path, monkeypatch):
         google_insert=False,
         google_credentials=None,
         google_token=None,
+        google_calendar_id=None,
+        google_calendar_name=None,
+        google_create_calendar=False,
         icloud_insert=False,
         icloud_id=None,
         icloud_app_pass=None,
@@ -196,6 +301,9 @@ def test_build_runtime_options_merges_config(tmp_path, monkeypatch):
     assert options.google_insert is True
     assert options.google_credentials == str(project_root / "cfg_creds.json")
     assert options.google_token == str(project_root / "cfg_token.json")
+    assert options.google_calendar_id is None
+    assert options.google_calendar_name == "Company Earnings"
+    assert options.google_create_calendar is True
     assert options.icloud_insert is True
     assert options.icloud_id == "user@icloud.com"
     assert options.icloud_app_pass == "abcd-efgh"
@@ -206,6 +314,9 @@ def test_build_runtime_options_cli_overrides_config(tmp_path, monkeypatch):
         "GOOGLE_CREDENTIALS_PATH",
         "GOOGLE_TOKEN_PATH",
         "GOOGLE_INSERT",
+        "GOOGLE_CALENDAR_ID",
+        "GOOGLE_CALENDAR_NAME",
+        "GOOGLE_CREATE_CALENDAR",
         "ICLOUD_INSERT",
         "ICLOUD_APPLE_ID",
         "ICLOUD_APP_PASSWORD",
@@ -227,6 +338,9 @@ def test_build_runtime_options_cli_overrides_config(tmp_path, monkeypatch):
         google_insert=True,
         google_credentials="cli_creds.json",
         google_token=None,
+        google_calendar_id="custom-id",
+        google_calendar_name=None,
+        google_create_calendar=True,
         icloud_insert=False,
         icloud_id=None,
         icloud_app_pass=None,
@@ -246,12 +360,18 @@ def test_build_runtime_options_cli_overrides_config(tmp_path, monkeypatch):
     assert options.days == 10
     assert options.google_credentials == str(project_root / "cli_creds.json")
     assert options.google_insert is True
+    assert options.google_calendar_id == "custom-id"
+    assert options.google_calendar_name is None
+    assert options.google_create_calendar is True
 
 
 def test_build_runtime_options_uses_env_defaults(tmp_path, monkeypatch):
     monkeypatch.delenv("GOOGLE_CREDENTIALS_PATH", raising=False)
     monkeypatch.delenv("GOOGLE_TOKEN_PATH", raising=False)
     monkeypatch.delenv("GOOGLE_INSERT", raising=False)
+    monkeypatch.delenv("GOOGLE_CALENDAR_ID", raising=False)
+    monkeypatch.delenv("GOOGLE_CALENDAR_NAME", raising=False)
+    monkeypatch.delenv("GOOGLE_CREATE_CALENDAR", raising=False)
     monkeypatch.delenv("ICLOUD_INSERT", raising=False)
     monkeypatch.delenv("ICLOUD_APPLE_ID", raising=False)
     monkeypatch.delenv("ICLOUD_APP_PASSWORD", raising=False)
@@ -259,6 +379,8 @@ def test_build_runtime_options_uses_env_defaults(tmp_path, monkeypatch):
     monkeypatch.setenv("GOOGLE_CREDENTIALS_PATH", "/secrets/credentials.json")
     monkeypatch.setenv("GOOGLE_TOKEN_PATH", "/secrets/token.json")
     monkeypatch.setenv("GOOGLE_INSERT", "true")
+    monkeypatch.setenv("GOOGLE_CALENDAR_NAME", "Company Earnings")
+    monkeypatch.setenv("GOOGLE_CREATE_CALENDAR", "1")
     monkeypatch.setenv("ICLOUD_INSERT", "1")
     monkeypatch.setenv("ICLOUD_APPLE_ID", "user@icloud.com")
     monkeypatch.setenv("ICLOUD_APP_PASSWORD", "pass-1234")
@@ -271,6 +393,9 @@ def test_build_runtime_options_uses_env_defaults(tmp_path, monkeypatch):
         google_insert=False,
         google_credentials=None,
         google_token=None,
+        google_calendar_id=None,
+        google_calendar_name=None,
+        google_create_calendar=False,
         icloud_insert=False,
         icloud_id=None,
         icloud_app_pass=None,
@@ -292,6 +417,8 @@ def test_build_runtime_options_uses_env_defaults(tmp_path, monkeypatch):
     assert options.google_credentials == str(Path("/secrets/credentials.json"))
     assert options.google_token == str(Path("/secrets/token.json"))
     assert options.google_insert is True
+    assert options.google_calendar_name == "Company Earnings"
+    assert options.google_create_calendar is True
     assert options.icloud_insert is True
     assert options.icloud_id == "user@icloud.com"
     assert options.icloud_app_pass == "pass-1234"
@@ -317,6 +444,9 @@ def test_build_runtime_options_resolves_paths_relative_to_config(tmp_path, monke
         google_insert=False,
         google_credentials=None,
         google_token=None,
+        google_calendar_id=None,
+        google_calendar_name=None,
+        google_create_calendar=False,
         icloud_insert=False,
         icloud_id=None,
         icloud_app_pass=None,
@@ -331,3 +461,59 @@ def test_build_runtime_options_resolves_paths_relative_to_config(tmp_path, monke
 
     assert options.google_credentials == str(config_base / "secrets/credentials.json")
     assert options.google_token == str(config_base / "secrets/token.json")
+    assert options.google_calendar_id == "primary"
+
+
+def test_google_insert_creates_calendar_when_missing(monkeypatch):
+    service = StubGoogleService()
+    monkeypatch.setattr(calendars_mod, "_get_google_service", lambda *args, **kwargs: service)
+
+    event = EarningsEvent("AAPL", date(2024, 5, 1), "AMC", "FMP")
+
+    calendar_id = calendars_mod.google_insert(
+        [event],
+        calendar_id=None,
+        creds_path="cred.json",
+        token_path="token.json",
+        calendar_name="Company Earnings",
+        create_if_missing=True,
+    )
+
+    assert calendar_id in service.calendars_data
+    assert service.calendars_data[calendar_id] == "Company Earnings"
+    assert len(service.calendar_inserts) == 1
+    assert len(service.events_data[calendar_id]) == 1
+
+
+def test_google_insert_upserts_existing(monkeypatch):
+    service = StubGoogleService({"primary": "Primary"})
+    monkeypatch.setattr(calendars_mod, "_get_google_service", lambda *args, **kwargs: service)
+
+    base_event = EarningsEvent("MSFT", date(2024, 6, 10), "BMO", "FMP")
+
+    calendars_mod.google_insert(
+        [base_event],
+        calendar_id="primary",
+        creds_path="cred.json",
+        token_path="token.json",
+    )
+
+    assert len(service.events_data["primary"]) == 1
+    first_event = service.events_data["primary"][0]
+    event_id = first_event["id"]
+
+    updated_event = EarningsEvent("MSFT", date(2024, 6, 10), "BMO", "FMP", notes="Updated desc")
+
+    calendars_mod.google_insert(
+        [updated_event],
+        calendar_id="primary",
+        creds_path="cred.json",
+        token_path="token.json",
+    )
+
+    assert len(service.events_data["primary"]) == 1
+    stored_event = service.events_data["primary"][0]
+    assert stored_event["id"] == event_id
+    assert "Updated desc" in stored_event["description"]
+    assert len(service.insert_calls) == 1
+    assert len(service.update_calls) == 1
