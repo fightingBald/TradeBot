@@ -70,6 +70,10 @@ Once running, the API provides:
   black --check app tests
   ```
 
+## Data Utilities
+
+- `data_sources/earnings_to_calendar` 提供了一个模块化的 CLI/库，用于从 FMP 或 Finnhub 抓取财报日程并导出到 ICS、Google Calendar 或 iCloud。运行 `python -m data_sources.earnings_to_calendar --help` 查看可用参数，或使用 `--config=path/to/config.json` 统一管理 `symbols`、Google/iCloud 凭据等默认选项。
+
 ## Notes
 
 - Quote availability depends on the data feed tied to your Alpaca plan. Demo accounts usually have access to the `iex` feed.

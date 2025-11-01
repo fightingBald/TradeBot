@@ -1,0 +1,187 @@
+import json
+from datetime import date
+from types import SimpleNamespace
+
+import pytest
+
+from data_sources.earnings_to_calendar import (
+    EarningsEvent,
+    FmpEarningsProvider,
+    FinnhubEarningsProvider,
+    RuntimeOptions,
+    build_ics,
+    deduplicate_events,
+    _parse_symbols,
+)
+from data_sources.earnings_to_calendar.cli import (
+    _build_runtime_options,
+    _load_config,
+)
+
+
+class StubResponse:
+    def __init__(self, payload):
+        self._payload = payload
+
+    def json(self):
+        return self._payload
+
+    def raise_for_status(self):
+        return None
+
+
+def test_fmp_provider_filters_and_normalizes():
+    payload = [
+        {"symbol": "aapl", "date": "2024-01-25", "time": "AMC"},
+        {"symbol": "msft", "earningsDate": "2024-01-30"},
+        {"symbol": "tsla", "date": "bad-date"},
+    ]
+
+    captured: dict[str, str] = {}
+
+    def fake_get(url, **kwargs):
+        captured["url"] = url
+        captured["user_agent"] = kwargs["headers"]["User-Agent"]
+        return StubResponse(payload)
+
+    provider = FmpEarningsProvider("token", http_get=fake_get)
+    events = provider.fetch(["AAPL", "MSFT"], date(2024, 1, 1), date(2024, 1, 31))
+
+    assert captured["user_agent"] == "earnings-to-calendar/1.0"
+    assert "from=2024-01-01" in captured["url"]
+    assert "to=2024-01-31" in captured["url"]
+    assert len(events) == 2
+    assert events[0] == EarningsEvent("AAPL", date(2024, 1, 25), "AMC", "FMP")
+    assert events[1] == EarningsEvent("MSFT", date(2024, 1, 30), "", "FMP")
+
+
+def test_finnhub_provider_handles_nested_payload():
+    payload = {
+        "earningsCalendar": [
+            {"symbol": "AAPL", "date": "2024-01-25", "hour": "bmo"},
+            {"symbol": "GOOGL", "date": None},
+        ]
+    }
+
+    def fake_get(url, **kwargs):
+        return StubResponse(payload)
+
+    provider = FinnhubEarningsProvider("token", http_get=fake_get)
+    events = provider.fetch(["AAPL", "GOOGL"], date(2024, 1, 1), date(2024, 1, 31))
+
+    assert events == [
+        EarningsEvent("AAPL", date(2024, 1, 25), "BMO", "Finnhub"),
+    ]
+
+
+def test_deduplicate_events_preserves_first_occurrence():
+    first = EarningsEvent("AAPL", date(2024, 1, 10), "BMO", "FMP")
+    duplicate = EarningsEvent("AAPL", date(2024, 1, 10), "AMC", "Finnhub")
+    other = EarningsEvent("MSFT", date(2024, 1, 12), "", "FMP")
+
+    deduped = deduplicate_events([first, duplicate, other])
+
+    assert deduped == [first, other]
+
+
+def test_build_ics_generates_expected_fields():
+    event = EarningsEvent("AAPL", date(2024, 1, 25), "AMC", "FMP", url="https://example.com")
+    ics = build_ics([event], prodid="-//test//")
+
+    assert "PRODID:-//test//" in ics
+    assert "SUMMARY:AAPL Earnings (AMC)" in ics
+    assert "DESCRIPTION:Earnings date from FMP." in ics
+    assert "URL:https://example.com" in ics
+
+
+@pytest.mark.parametrize(
+    "raw,expected",
+    [
+        ("AAPL, msft, AAPL", ["AAPL", "MSFT"]),
+        ("  , ,", []),
+        ("TSLA", ["TSLA"]),
+    ],
+)
+def test_parse_symbols_normalizes_and_deduplicates(raw, expected):
+    assert _parse_symbols(raw.split(",")) == expected
+
+
+def test_load_config_reads_json(tmp_path):
+    config_path = tmp_path / "config.json"
+    config_path.write_text(json.dumps({"symbols": ["AAPL"]}), encoding="utf-8")
+
+    config = _load_config(str(config_path))
+
+    assert config["symbols"] == ["AAPL"]
+
+
+def test_build_runtime_options_merges_config(tmp_path):
+    config = {
+        "symbols": ["AAPL", "MSFT"],
+        "source": "finnhub",
+        "days": "45",
+        "export_ics": "out.ics",
+        "google_insert": True,
+        "google_credentials": "cfg_creds.json",
+        "google_token": "cfg_token.json",
+        "icloud_insert": True,
+        "icloud_id": "user@icloud.com",
+        "icloud_app_pass": "abcd-efgh",
+    }
+
+    parsed = SimpleNamespace(
+        symbols=None,
+        source=None,
+        days=None,
+        export_ics=None,
+        google_insert=False,
+        google_credentials=None,
+        google_token=None,
+        icloud_insert=False,
+        icloud_id=None,
+        icloud_app_pass=None,
+    )
+
+    options = _build_runtime_options(parsed, config)
+
+    assert isinstance(options, RuntimeOptions)
+    assert options.symbols == ["AAPL", "MSFT"]
+    assert options.source == "finnhub"
+    assert options.days == 45
+    assert options.export_ics == "out.ics"
+    assert options.google_insert is True
+    assert options.google_credentials == "cfg_creds.json"
+    assert options.google_token == "cfg_token.json"
+    assert options.icloud_insert is True
+    assert options.icloud_id == "user@icloud.com"
+    assert options.icloud_app_pass == "abcd-efgh"
+
+
+def test_build_runtime_options_cli_overrides_config():
+    config = {
+        "symbols": ["AAPL"],
+        "source": "finnhub",
+        "days": 30,
+        "google_credentials": "cfg.json",
+    }
+
+    parsed = SimpleNamespace(
+        symbols="TSLA, msft",
+        source="fmp",
+        days=10,
+        export_ics=None,
+        google_insert=True,
+        google_credentials="cli_creds.json",
+        google_token=None,
+        icloud_insert=False,
+        icloud_id=None,
+        icloud_app_pass=None,
+    )
+
+    options = _build_runtime_options(parsed, config)
+
+    assert options.symbols == ["TSLA", "MSFT"]
+    assert options.source == "fmp"
+    assert options.days == 10
+    assert options.google_credentials == "cli_creds.json"
+    assert options.google_insert is True

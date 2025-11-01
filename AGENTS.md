@@ -81,6 +81,10 @@
 * **动态维护**：任何**布局相关**变更都需同步更新本节，并在 PR 描述附迁移说明（包名/导入路径/可执行名/镜像标签变更等）。
 * **校验**：PR CI 应包含 layout 校验脚本（可选）：`scripts/verify_layout.sh` 比对目录变化与本节声明。
 
+当前关键目录：
+- `app/` — FastAPI 服务分层（config/models/services/templates）。
+- `data_sources/earnings_to_calendar/` — 财报日历 CLI 包，包含 `config.py`、`domain.py`、`providers.py`、`calendars.py` 与 `cli.py` 等模块化组件。
+
 ---
 
 ## 3) BUILD & DEV COMMANDS（统一命令面）
@@ -197,6 +201,16 @@
 * handler 出现业务决策或多步编排；
 * domain 与 infra 互相引用；
 * 文件超大且混层。
+
+---
+
+## 10.A) HOW TO REFACTOR（重构操作指引）
+
+* **对齐动机**：确认业务或可维护性痛点，结合「触发信号」判断是否需要重构，记录现状与目标边界，使目录和代码更加模块化；必要时将单一巨型文件拆解成职责明确的多个模块，或新建文件夹归类，保持文件目录结构职责清晰。
+* **设计快照**：先产出最小设计与依赖图，识别跨层影响；必要时约定迁移阶段，确保单向依赖不被破坏。
+* **渐进式递交**：拆分为可验证的小步提交，保持主干随时可 build/test；优先 `MOVE`→`ADAPT`→`CLEAN` 顺序减少 diff。
+* **验证闭环**：每步完成后跑 `make build && make test`，并针对受影响路径补/调测试，确保行为未变。
+* **文档同步**：涉及目录/职责调整时同步更新 §2 与 README 目录树，输出迁移说明与回滚方案。
 
 ---
 
