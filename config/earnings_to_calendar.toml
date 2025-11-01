@@ -1,13 +1,13 @@
 # Earnings → Calendar CLI defaults (TOML)
 
 # 需要抓取的股票列表，可随时注释/调整
-symbols = ["AAPL", "MSFT", "NVDA"]
+symbols = ["CRWV", "META", "AAPL", "ORCL", "PLTR", "OKLO", "AVGO", "CRCL", "TSLA", "FLNC", "GOOG", "RKLB", "MSFT", "NVDA"]
 
 # 数据来源 (fmp 或 finnhub)
 source = "fmp"
 
 # 查询天数（今天起算），取消注释修改
-days = 90
+days = 180
 
 # 打开写入 Google Calendar（若想关闭，可以注释下面几行）
 google_insert = true
@@ -18,7 +18,7 @@ google_token = "secrets/token.json"
 # google_calendar_id = "primary"
 
 # 若希望按名称写入（不存在则自动创建），取消注释
-google_calendar_name = "Company Earnings"
+google_calendar_name = "Company Earning"
 google_create_calendar = true
 
 # 导出 ICS 备用

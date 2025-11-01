@@ -78,7 +78,7 @@ def _get_google_service(creds_path: str, token_path: str):
     from google_auth_oauthlib.flow import InstalledAppFlow
     from google.auth.transport.requests import Request
 
-    scopes = ["https://www.googleapis.com/auth/calendar.events"]
+    scopes = ["https://www.googleapis.com/auth/calendar"]
     creds = None
     if os.path.exists(token_path):
         creds = Credentials.from_authorized_user_file(token_path, scopes)
