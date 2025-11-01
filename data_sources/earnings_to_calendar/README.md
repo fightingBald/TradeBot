@@ -59,6 +59,41 @@ python -m data_sources.earnings_to_calendar --config=./earnings_config.json
 ```
 若命令行提供了相同参数，将优先覆盖配置文件内的数值。
 
+## 如何把财报日程同步到 Google Calendar（大白话版）
+
+1. 到 Google Calendar API 的 Quickstart 页面下载 `credentials.json`，丢在项目根目录（或者你喜欢的路径，后面命令要对应）。
+2. 准备好数据源的 API Key，例如：
+   ```bash
+   export FMP_API_KEY=你的FMP密钥
+   ```
+3. 第一次运行命令：
+   ```bash
+   python -m data_sources.earnings_to_calendar \
+     --symbols=AAPL,MSFT,NVDA \
+     --source=fmp \
+     --google-insert \
+     --google-credentials=credentials.json \
+     --google-token=token.json
+   ```
+   跑起来后会跳浏览器让你授权，授权完会在同目录生成 `token.json`（以后会自动刷新）。
+4. 到 Google Calendar（默认的 primary 日历）里看下有没有新的财报提醒。
+5. 想要固定配置？写一个 JSON（比如 `earnings_config.json`）：
+   ```json
+   {
+     "symbols": ["AAPL", "MSFT", "NVDA"],
+     "source": "fmp",
+     "days": 90,
+     "google_insert": true,
+     "google_credentials": "credentials.json",
+     "google_token": "token.json"
+   }
+   ```
+   以后直接：
+   ```bash
+   python -m data_sources.earnings_to_calendar --config=earnings_config.json
+   ```
+6. 想要顺便导出备份？加上 `--export-ics=earnings.ics` 就会多生成一个 ICS 文件。
+
 ## 代码结构
 
 - `config.py`：常量配置，如默认天数、请求超时、User-Agent。
