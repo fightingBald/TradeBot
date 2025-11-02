@@ -51,6 +51,7 @@ python -m data_sources.earnings_to_calendar \
 - `source_timezone` / `target_timezone`：数据源时区与日历写入时区；
 - `event_duration_minutes`：默认事件时长（分钟）；
 - `[session_times]`：将诸如 `BMO`、`AMC` 映射到具体时间；
+- `market_events`：是否同时加入四巫日/OPEX/VIX 结算等市场事件；
 TOML 支持 `#` 注释，可按需启用/关闭字段，也可以通过 `--config=...` 指向其他 TOML/JSON 文件。
 
 运行时只需覆盖想临时调整的字段（TOML 支持 `#` 注释，方便禁用配置）：

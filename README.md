@@ -85,6 +85,7 @@ Once running, the API provides:
     --config=config/earnings_to_calendar.toml \
     --env-file=.env \
     --google-insert \
+    --market-events \
     --log-level=INFO
   ```
   （参数在 TOML 中可随时注释/启用，命令行仅覆盖需要临时调整的字段。）

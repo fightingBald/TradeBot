@@ -1,46 +1,37 @@
 # Earnings → Calendar CLI defaults (TOML)
 
 # 需要抓取的股票列表，可随时注释/调整
-symbols = ["CRWV", "META", "AAPL", "COIN", "NBIS","ORCL", "HOOD","PLTR", "OKLO", "AVGO", "CRCL", "TSLA", "FLNC", "GOOG", "RKLB", "MSFT", "NVDA"]
+symbols = ["CRWV", "META", "AAPL", "COIN", "NBIS", "ORCL", "HOOD", "PLTR", "OKLO", "AVGO", "CRCL", "TSLA", "FLNC", "GOOG", "RKLB", "MSFT", "NVDA"]
 
 # 数据来源 (fmp 或 finnhub)
 source = "fmp"
 
 # 查询天数（今天起算）
-days = 365
+days = 180
 
-# 打开写入 Google Calendar（若想关闭，可以注释下面几行）
-google_insert = true
-google_credentials = "secrets/credentials.json"
-google_token = "secrets/token.json"
-
-# 如果已有 calendarId，直接写入即可
-# google_calendar_id = "primary"
-
-# 若希望按名称写入（不存在则自动创建），取消注释
-google_calendar_name = "Company Earning"
-google_create_calendar = true
 # 来源与目标时区设置（IANA 时区名）
 source_timezone = "America/New_York"
-
 target_timezone = "America/New_York"
 
-# 若日历要使用定时事件，可调整时长
+# 若日历要使用定时事件，可调整时长（单位：分钟）
 event_duration_minutes = 60
 
-
-# 导出 ICS 备用
-#export_ics = 
-
-# iCloud CalDAV 参数（按需启用）
-#icloud_insert = 
-
-#icloud_id = 
-
-#icloud_app_pass = 
+# 是否添加市场事件（四巫日 / OPEX / VIX）
+market_events = true
 
 # 会话时间映射，可根据需要覆盖（BMO=盘前, AMC=盘后）
 [session_times]
 BMO = "08:00"
 AMC = "17:00"
 
+# 打开写入 Google Calendar
+google_insert = true
+google_credentials = "secrets/credentials.json"
+google_token = "secrets/token.json"
+google_calendar_name = "Company Earnings"
+google_create_calendar = true
+
+# iCloud CalDAV 参数（按需启用）
+#icloud_insert = false
+#icloud_id = "user@icloud.com"
+#icloud_app_pass = ""

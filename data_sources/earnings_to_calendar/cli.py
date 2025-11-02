@@ -8,11 +8,12 @@ import tomllib
 import os
 import sys
 from dataclasses import dataclass
-from datetime import date, timedelta
+from datetime import date, datetime, time, timedelta
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Mapping, Sequence
 
 import logging
+from zoneinfo import ZoneInfo
 
 from .calendars import build_ics, google_insert, icloud_caldav_insert
 from .defaults import (
@@ -24,7 +25,7 @@ from .defaults import (
     DEFAULT_TIMEOUT_SECONDS,
     USER_AGENT,
 )
-from .domain import deduplicate_events
+from .domain import EarningsEvent, deduplicate_events
 from .logging_utils import LOGGER_NAME, get_logger
 from .providers import PROVIDERS, EarningsDataProvider
 
@@ -51,6 +52,9 @@ target_timezone = "America/New_York"
 # 若日历要使用定时事件，可调整时长（单位：分钟）
 event_duration_minutes = 60
 
+# 是否添加市场事件（四巫日 / OPEX / VIX）
+market_events = false
+
 # 会话时间映射，可根据需要覆盖（BMO=盘前, AMC=盘后）
 [session_times]
 BMO = "08:00"
@@ -67,6 +71,7 @@ _ENV_KEY_GOOGLE_CREATE_CAL = "GOOGLE_CREATE_CALENDAR"
 _ENV_KEY_SOURCE_TZ = "SOURCE_TIMEZONE"
 _ENV_KEY_TARGET_TZ = "TARGET_TIMEZONE"
 _ENV_KEY_EVENT_DURATION = "EVENT_DURATION_MINUTES"
+_ENV_KEY_MARKET_EVENTS = "MARKET_EVENTS"
 _ENV_KEY_SESSION_TIMES = "SESSION_TIMES"
 _ENV_KEY_ICLOUD_INSERT = "ICLOUD_INSERT"
 _ENV_KEY_ICLOUD_ID = "ICLOUD_APPLE_ID"
@@ -91,6 +96,7 @@ class RuntimeOptions:
     target_timezone: str
     event_duration_minutes: int
     session_time_map: Dict[str, str]
+    market_events: bool
     icloud_insert: bool
     icloud_id: str | None
     icloud_app_pass: str | None
@@ -139,6 +145,85 @@ def _read_env_file(env_path: Path) -> None:
                 os.environ.setdefault(key, cleaned)
     except OSError as exc:
         raise RuntimeError(f"无法读取环境文件：{env_path}") from exc
+
+
+
+def _nth_weekday(year: int, month: int, weekday: int) -> date | None:
+    first = date(year, month, 1)
+    offset = (weekday - first.weekday()) % 7
+    third = first + timedelta(days=offset + 14)
+    if third.month == month:
+        return third
+    return None
+
+
+def _month_range(start: date, end: date):
+    year, month = start.year, start.month
+    while date(year, month, 1) <= date(end.year, end.month, 1):
+        yield year, month
+        if month == 12:
+            year += 1
+            month = 1
+        else:
+            month += 1
+
+
+def _generate_market_events(start: date, end: date, options: RuntimeOptions) -> List[EarningsEvent]:
+    tz = ZoneInfo(options.source_timezone)
+    duration = timedelta(minutes=options.event_duration_minutes)
+    default_time = time(9, 30)
+    events: List[EarningsEvent] = []
+
+    def add_event(event_date: date, symbol: str, title: str, notes: str):
+        if event_date < start or event_date > end:
+            return
+        start_at = datetime.combine(event_date, default_time, tzinfo=tz)
+        end_at = start_at + duration
+        events.append(
+            EarningsEvent(
+                symbol=symbol,
+                date=event_date,
+                session=title.upper(),
+                source="MarketCalendar",
+                notes=notes,
+                start_at=start_at,
+                end_at=end_at,
+                timezone=tz.key,
+            )
+        )
+
+    for year, month in _month_range(start, end):
+        third_friday = _nth_weekday(year, month, 4)
+        if third_friday:
+            add_event(
+                third_friday,
+                symbol="MARKET-OPEX",
+                title="OPEX",
+                notes="Monthly options expiration (third Friday)",
+            )
+            if month in {3, 6, 9, 12}:
+                add_event(
+                    third_friday,
+                    symbol="MARKET-FOUR-WITCHES",
+                    title="Four Witches",
+                    notes="Quadruple Witching (stocks & futures options)",
+                )
+        third_wed = _nth_weekday(year, month, 2)
+        if third_wed:
+            add_event(
+                third_wed,
+                symbol="MARKET-VIX-OPTIONS",
+                title="VIX Options",
+                notes="VIX options settlement (third Wednesday)",
+            )
+            futures_day = third_wed + timedelta(days=1)
+            add_event(
+                futures_day,
+                symbol="MARKET-VIX-FUTURES",
+                title="VIX Futures",
+                notes="VIX futures settlement (following options)",
+            )
+    return events
 
 
 def _load_env_file(path: str | None, *, search_root: Path | None = None) -> None:
@@ -389,6 +474,16 @@ def _build_runtime_options(
         default=DEFAULT_SESSION_TIMES,
     )
 
+    if parsed.market_events:
+        market_events = True
+    else:
+        config_market_events = _coerce_bool(config.get("market_events")) if "market_events" in config else None
+        if config_market_events is not None:
+            market_events = config_market_events
+        else:
+            env_market_events = _coerce_bool(os.getenv(_ENV_KEY_MARKET_EVENTS))
+            market_events = env_market_events if env_market_events is not None else False
+
     if parsed.google_insert:
         google_insert = True
     else:
@@ -433,6 +528,7 @@ def _build_runtime_options(
         target_timezone=str(target_timezone),
         event_duration_minutes=event_duration,
         session_time_map=session_time_map,
+        market_events=market_events,
         icloud_insert=icloud_insert,
         icloud_id=str(icloud_id) if icloud_id is not None else None,
         icloud_app_pass=str(icloud_app_pass) if icloud_app_pass is not None else None,
@@ -457,6 +553,7 @@ def main(args: Sequence[str] | None = None) -> None:
     parser.add_argument("--target-tz", help="Timezone for calendar output (e.g. Europe/Berlin)")
     parser.add_argument("--event-duration", type=int, help="Duration (minutes) for timed events")
     parser.add_argument("--session-times", help="Override session times, e.g. BMO=08:00,AMC=17:00")
+    parser.add_argument("--market-events", action="store_true", help="Include major market calendar events")
     parser.add_argument("--icloud-insert", action="store_true", help="Insert to iCloud via CalDAV")
     parser.add_argument("--icloud-id")
     parser.add_argument("--icloud-app-pass")
@@ -504,6 +601,11 @@ def main(args: Sequence[str] | None = None) -> None:
         until,
     )
     events = provider.fetch(options.symbols, since, until)
+    if options.market_events:
+        extras = _generate_market_events(since, until, options)
+        if extras:
+            logger.info("追加市场事件 %d 条", len(extras))
+            events.extend(extras)
     unique_events = deduplicate_events(events)
     logger.info("共获取事件 %d 条（去重后 %d 条）", len(events), len(unique_events))
 

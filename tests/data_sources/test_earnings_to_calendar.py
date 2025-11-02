@@ -26,6 +26,7 @@ from data_sources.earnings_to_calendar.cli import (
     _build_runtime_options,
     _load_config,
     _load_env_file,
+    _generate_market_events,
 )
 import data_sources.earnings_to_calendar.calendars as calendars_mod
 from zoneinfo import ZoneInfo
@@ -315,6 +316,7 @@ def test_build_runtime_options_merges_config(tmp_path, monkeypatch):
         "target_timezone": "Europe/Berlin",
         "event_duration_minutes": "90",
         "session_times": {"BMO": "07:30", "AMC": "18:45"},
+        "market_events": True,
         "icloud_insert": True,
         "icloud_id": "user@icloud.com",
         "icloud_app_pass": "abcd-efgh",
@@ -335,6 +337,7 @@ def test_build_runtime_options_merges_config(tmp_path, monkeypatch):
         target_tz=None,
         event_duration=None,
         session_times=None,
+        market_events=False,
         icloud_insert=False,
         icloud_id=None,
         icloud_app_pass=None,
@@ -367,6 +370,7 @@ def test_build_runtime_options_merges_config(tmp_path, monkeypatch):
     assert options.icloud_insert is True
     assert options.icloud_id == "user@icloud.com"
     assert options.icloud_app_pass == "abcd-efgh"
+    assert options.market_events is True
 
 
 def test_build_runtime_options_cli_overrides_config(tmp_path, monkeypatch):
@@ -405,6 +409,7 @@ def test_build_runtime_options_cli_overrides_config(tmp_path, monkeypatch):
         target_tz=None,
         event_duration=None,
         session_times=None,
+        market_events=True,
         icloud_insert=False,
         icloud_id=None,
         icloud_app_pass=None,
@@ -431,6 +436,7 @@ def test_build_runtime_options_cli_overrides_config(tmp_path, monkeypatch):
     assert options.target_timezone == DEFAULT_TARGET_TIMEZONE
     assert options.event_duration_minutes == DEFAULT_EVENT_DURATION_MINUTES
     assert options.session_time_map == DEFAULT_SESSION_TIMES
+    assert options.market_events is True
 
 
 def test_build_runtime_options_uses_env_defaults(tmp_path, monkeypatch):
@@ -440,6 +446,7 @@ def test_build_runtime_options_uses_env_defaults(tmp_path, monkeypatch):
     monkeypatch.delenv("GOOGLE_CALENDAR_ID", raising=False)
     monkeypatch.delenv("GOOGLE_CALENDAR_NAME", raising=False)
     monkeypatch.delenv("GOOGLE_CREATE_CALENDAR", raising=False)
+    monkeypatch.delenv("MARKET_EVENTS", raising=False)
     monkeypatch.delenv("ICLOUD_INSERT", raising=False)
     monkeypatch.delenv("ICLOUD_APPLE_ID", raising=False)
     monkeypatch.delenv("ICLOUD_APP_PASSWORD", raising=False)
@@ -449,6 +456,7 @@ def test_build_runtime_options_uses_env_defaults(tmp_path, monkeypatch):
     monkeypatch.setenv("GOOGLE_INSERT", "true")
     monkeypatch.setenv("GOOGLE_CALENDAR_NAME", "Company Earnings")
     monkeypatch.setenv("GOOGLE_CREATE_CALENDAR", "1")
+    monkeypatch.setenv("MARKET_EVENTS", "true")
     monkeypatch.setenv("SOURCE_TIMEZONE", "America/New_York")
     monkeypatch.setenv("TARGET_TIMEZONE", "Asia/Shanghai")
     monkeypatch.setenv("EVENT_DURATION_MINUTES", "75")
@@ -472,6 +480,7 @@ def test_build_runtime_options_uses_env_defaults(tmp_path, monkeypatch):
         target_tz=None,
         event_duration=None,
         session_times=None,
+        market_events=None,
         icloud_insert=False,
         icloud_id=None,
         icloud_app_pass=None,
@@ -499,6 +508,7 @@ def test_build_runtime_options_uses_env_defaults(tmp_path, monkeypatch):
     assert options.target_timezone == "Asia/Shanghai"
     assert options.event_duration_minutes == 75
     assert options.session_time_map == {"BMO": "07:45", "AMC": "19:00"}
+    assert options.market_events is True
     assert options.icloud_insert is True
     assert options.icloud_id == "user@icloud.com"
     assert options.icloud_app_pass == "pass-1234"
@@ -531,6 +541,7 @@ def test_build_runtime_options_resolves_paths_relative_to_config(tmp_path, monke
         target_tz=None,
         event_duration=None,
         session_times=None,
+        market_events=False,
         icloud_insert=False,
         icloud_id=None,
         icloud_app_pass=None,
@@ -550,6 +561,40 @@ def test_build_runtime_options_resolves_paths_relative_to_config(tmp_path, monke
     assert options.target_timezone == DEFAULT_TARGET_TIMEZONE
     assert options.event_duration_minutes == DEFAULT_EVENT_DURATION_MINUTES
     assert options.session_time_map == DEFAULT_SESSION_TIMES
+    assert options.market_events is False
+
+
+def test_generate_market_events():
+    options = RuntimeOptions(
+        symbols=[],
+        source="fmp",
+        days=0,
+        export_ics=None,
+        google_insert=False,
+        google_credentials="",
+        google_token="",
+        google_calendar_id=None,
+        google_calendar_name=None,
+        google_create_calendar=False,
+        source_timezone="America/New_York",
+        target_timezone="Europe/Berlin",
+        event_duration_minutes=60,
+        session_time_map={"BMO": "08:00", "AMC": "17:00"},
+        market_events=True,
+        icloud_insert=False,
+        icloud_id=None,
+        icloud_app_pass=None,
+    )
+
+    events = _generate_market_events(date(2024, 3, 1), date(2024, 3, 31), options)
+    assert len(events) == 4
+    kinds = {e.symbol: e for e in events}
+    assert set(kinds) == {"MARKET-OPEX", "MARKET-FOUR-WITCHES", "MARKET-VIX-OPTIONS", "MARKET-VIX-FUTURES"}
+    ny = ZoneInfo("America/New_York")
+    assert kinds["MARKET-OPEX"].start_at == datetime(2024, 3, 15, 9, 30, tzinfo=ny)
+    assert kinds["MARKET-VIX-OPTIONS"].start_at.date() == date(2024, 3, 20)
+    assert kinds["MARKET-VIX-FUTURES"].start_at.date() == date(2024, 3, 21)
+    assert all(ev.timezone == "America/New_York" for ev in events)
 
 
 def test_google_insert_creates_calendar_when_missing(monkeypatch):
