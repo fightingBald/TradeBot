@@ -14,6 +14,7 @@ from .calendars import build_ics, google_insert, icloud_caldav_insert
 from .domain import EarningsEvent, deduplicate_events
 from .logging_utils import get_logger
 from .market_events import generate_market_events
+from .macro_events import fetch_macro_events
 from .providers import PROVIDERS, EarningsDataProvider
 from .settings import RuntimeOptions
 
@@ -68,6 +69,11 @@ def collect_events(
         if extras:
             logger.info("追加市场事件 %d 条", len(extras))
             events.extend(extras)
+    if options.macro_events:
+        macro_events = fetch_macro_events(since, until, options)
+        if macro_events:
+            logger.info("追加宏观事件 %d 条", len(macro_events))
+            events.extend(macro_events)
     unique_events = deduplicate_events(events)
     logger.info("共获取事件 %d 条（去重后 %d 条）", len(events), len(unique_events))
     return unique_events

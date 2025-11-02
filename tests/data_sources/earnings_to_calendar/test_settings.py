@@ -109,6 +109,8 @@ def test_build_runtime_options_merges_config(tmp_path, monkeypatch):
         "icloud_insert": True,
         "icloud_id": "user@icloud.com",
         "icloud_app_pass": "abcd-efgh",
+        "macro_events": True,
+        "macro_event_keywords": ["FOMC", "CPI"],
     }
 
     parsed = SimpleNamespace(
@@ -130,6 +132,8 @@ def test_build_runtime_options_merges_config(tmp_path, monkeypatch):
         icloud_insert=False,
         icloud_id=None,
         icloud_app_pass=None,
+        macro_events=False,
+        macro_event_keywords=None,
     )
 
     project_root = Path(tmp_path)
@@ -160,6 +164,8 @@ def test_build_runtime_options_merges_config(tmp_path, monkeypatch):
     assert options.icloud_id == "user@icloud.com"
     assert options.icloud_app_pass == "abcd-efgh"
     assert options.market_events is True
+    assert options.macro_events is True
+    assert options.macro_event_keywords == ["FOMC", "CPI"]
 
 
 def test_build_runtime_options_cli_overrides_config(tmp_path, monkeypatch):
@@ -191,6 +197,8 @@ def test_build_runtime_options_cli_overrides_config(tmp_path, monkeypatch):
         icloud_insert=False,
         icloud_id=None,
         icloud_app_pass=None,
+        macro_events=True,
+        macro_event_keywords="Treasury",
     )
 
     project_root = Path(tmp_path)
@@ -215,6 +223,8 @@ def test_build_runtime_options_cli_overrides_config(tmp_path, monkeypatch):
     assert options.event_duration_minutes == DEFAULT_EVENT_DURATION_MINUTES
     assert options.session_time_map == DEFAULT_SESSION_TIMES
     assert options.market_events is True
+    assert options.macro_events is True
+    assert options.macro_event_keywords == ["Treasury"]
 
 
 def test_build_runtime_options_uses_env_defaults(tmp_path, monkeypatch):
@@ -226,10 +236,12 @@ def test_build_runtime_options_uses_env_defaults(tmp_path, monkeypatch):
     monkeypatch.setenv("GOOGLE_CALENDAR_NAME", "Company Earnings")
     monkeypatch.setenv("GOOGLE_CREATE_CALENDAR", "1")
     monkeypatch.setenv("MARKET_EVENTS", "true")
+    monkeypatch.setenv("MACRO_EVENTS", "1")
     monkeypatch.setenv("SOURCE_TIMEZONE", "America/New_York")
     monkeypatch.setenv("TARGET_TIMEZONE", "Asia/Shanghai")
     monkeypatch.setenv("EVENT_DURATION_MINUTES", "75")
     monkeypatch.setenv("SESSION_TIMES", "BMO=07:45,AMC=19:00")
+    monkeypatch.setenv("MACRO_EVENT_KEYWORDS", "FOMC,NFP")
     monkeypatch.setenv("ICLOUD_INSERT", "1")
     monkeypatch.setenv("ICLOUD_APPLE_ID", "user@icloud.com")
     monkeypatch.setenv("ICLOUD_APP_PASSWORD", "pass-1234")
@@ -253,6 +265,8 @@ def test_build_runtime_options_uses_env_defaults(tmp_path, monkeypatch):
         icloud_insert=False,
         icloud_id=None,
         icloud_app_pass=None,
+        macro_events=False,
+        macro_event_keywords=None,
     )
 
     config_base = Path(tmp_path) / "config_dir"
@@ -281,6 +295,8 @@ def test_build_runtime_options_uses_env_defaults(tmp_path, monkeypatch):
     assert options.icloud_insert is True
     assert options.icloud_id == "user@icloud.com"
     assert options.icloud_app_pass == "pass-1234"
+    assert options.macro_events is True
+    assert options.macro_event_keywords == ["FOMC", "NFP"]
 
 
 def test_build_runtime_options_resolves_paths_relative_to_config(tmp_path, monkeypatch):
@@ -316,6 +332,8 @@ def test_build_runtime_options_resolves_paths_relative_to_config(tmp_path, monke
         icloud_insert=False,
         icloud_id=None,
         icloud_app_pass=None,
+        macro_events=False,
+        macro_event_keywords=None,
     )
 
     options = build_runtime_options(
@@ -333,3 +351,4 @@ def test_build_runtime_options_resolves_paths_relative_to_config(tmp_path, monke
     assert options.event_duration_minutes == DEFAULT_EVENT_DURATION_MINUTES
     assert options.session_time_map == DEFAULT_SESSION_TIMES
     assert options.market_events is False
+    assert options.macro_events is False

@@ -34,6 +34,11 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--event-duration", type=int, help="Duration (minutes) for timed events")
     parser.add_argument("--session-times", help="Override session times, e.g. BMO=08:00,AMC=17:00")
     parser.add_argument("--market-events", action="store_true", help="Include major market calendar events")
+    parser.add_argument("--macro-events", action="store_true", help="Include macro economic events (FOMC/CPI/etc)")
+    parser.add_argument(
+        "--macro-event-keywords",
+        help="Comma separated macro event keywords to filter, e.g. FOMC,CPI,NFP",
+    )
     parser.add_argument("--icloud-insert", action="store_true", help="Insert to iCloud via CalDAV")
     parser.add_argument("--icloud-id")
     parser.add_argument("--icloud-app-pass")

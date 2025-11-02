@@ -10,6 +10,7 @@ from .providers import (
     FmpEarningsProvider,
     PROVIDERS,
 )
+from .macro_events import fetch_macro_events
 from .runner import RunSummary, apply_outputs, collect_events, run
 from .settings import RuntimeOptions, build_runtime_options, load_config, load_env_file, parse_symbols
 
@@ -30,6 +31,7 @@ __all__ = [
     "build_runtime_options",
     "collect_events",
     "deduplicate_events",
+    "fetch_macro_events",
     "google_insert",
     "icloud_caldav_insert",
     "load_config",

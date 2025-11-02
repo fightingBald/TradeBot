@@ -5,7 +5,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Mapping
 
@@ -48,6 +48,10 @@ event_duration_minutes = 60
 # 是否添加市场事件（四巫日 / OPEX / VIX）
 market_events = false
 
+# 是否添加宏观事件（FOMC / CPI / NFP 等）
+macro_events = false
+macro_event_keywords = ["FOMC", "ECB", "BOE", "BOJ", "CPI", "PPI", "NFP", "Retail Sales", "ISM", "Treasury"]
+
 # 会话时间映射，可根据需要覆盖（BMO=盘前, AMC=盘后）
 [session_times]
 BMO = "08:00"
@@ -68,6 +72,8 @@ _ENV_KEY_SESSION_TIMES = "SESSION_TIMES"
 _ENV_KEY_ICLOUD_INSERT = "ICLOUD_INSERT"
 _ENV_KEY_ICLOUD_ID = "ICLOUD_APPLE_ID"
 _ENV_KEY_ICLOUD_APP_PASS = "ICLOUD_APP_PASSWORD"
+_ENV_KEY_MACRO_EVENTS = "MACRO_EVENTS"
+_ENV_KEY_MACRO_KEYWORDS = "MACRO_EVENT_KEYWORDS"
 
 
 @dataclass
@@ -90,6 +96,8 @@ class RuntimeOptions:
     icloud_insert: bool
     icloud_id: str | None
     icloud_app_pass: str | None
+    macro_events: bool = False
+    macro_event_keywords: List[str] = field(default_factory=list)
 
 
 def parse_symbols(raw: Iterable[str]) -> List[str]:
@@ -210,6 +218,17 @@ def _coerce_symbols(value: Any) -> List[str]:
     if isinstance(value, Iterable):
         return parse_symbols(value)
     raise ValueError("symbols 配置必须是字符串或字符串列表")
+
+
+def _coerce_str_list(value: Any) -> List[str]:
+    if value is None:
+        return []
+    if isinstance(value, str):
+        items = [item.strip() for item in value.split(",")]
+        return [item for item in items if item]
+    if isinstance(value, Iterable):
+        return [str(item).strip() for item in value if str(item).strip()]
+    raise ValueError("宏观事件关键词必须是字符串或字符串列表")
 
 
 def _parse_session_times(value: Any, default: Dict[str, str]) -> Dict[str, str]:
@@ -407,6 +426,23 @@ def build_runtime_options(
         or os.getenv(_ENV_KEY_ICLOUD_APP_PASS)
     )
 
+    if getattr(parsed, "macro_events", None):
+        macro_events = True
+    else:
+        config_macro_events = _coerce_bool(config.get("macro_events")) if "macro_events" in config else None
+        if config_macro_events is not None:
+            macro_events = config_macro_events
+        else:
+            env_macro_events = _coerce_bool(os.getenv(_ENV_KEY_MACRO_EVENTS))
+            macro_events = env_macro_events if env_macro_events is not None else False
+
+    raw_macro_keywords = (
+        getattr(parsed, "macro_event_keywords", None)
+        or config.get("macro_event_keywords")
+        or os.getenv(_ENV_KEY_MACRO_KEYWORDS)
+    )
+    macro_event_keywords = _coerce_str_list(raw_macro_keywords)
+
     options = RuntimeOptions(
         symbols=symbols,
         source=source,
@@ -426,6 +462,8 @@ def build_runtime_options(
         icloud_insert=icloud_insert,
         icloud_id=str(icloud_id) if icloud_id is not None else None,
         icloud_app_pass=str(icloud_app_pass) if icloud_app_pass is not None else None,
+        macro_events=macro_events,
+        macro_event_keywords=macro_event_keywords,
     )
 
     return options

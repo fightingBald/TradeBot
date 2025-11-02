@@ -43,6 +43,8 @@ python -m data_sources.earnings_to_calendar \
 - `--export-ics`：将结果导出为本地 ICS 文件。
 - `--google-insert`：直接写入 Google Calendar，需要 `--google-credentials` 和 `--google-token`。
 - `--google-calendar-id` / `--google-calendar-name`：指定目标日历；未提供时默认使用 `primary`，若只给 name 可配合 `--google-create-calendar` 自动创建。
+- `--market-events`：追加四巫日 / OPEX / VIX 等市场事件。
+- `--macro-events`：追加宏观经济事件（FOMC / CPI / NFP 等），可配合 `--macro-event-keywords` 精准筛选。
 - `--icloud-insert`：同步到 iCloud，需提供 `--icloud-id` 与 `--icloud-app-pass`。
 
 ## 配置文件（可选）
@@ -52,6 +54,8 @@ python -m data_sources.earnings_to_calendar \
 - `event_duration_minutes`：默认事件时长（分钟）；
 - `[session_times]`：将诸如 `BMO`、`AMC` 映射到具体时间；
 - `market_events`：是否同时加入四巫日/OPEX/VIX 结算等市场事件；
+- `macro_events`：是否追加宏观事件（FOMC / ECB / BOE / BOJ 决议、CPI / PPI、NFP、零售销售、ISM、财政部拍卖等）；
+- `macro_event_keywords`：宏观事件关键词白名单，默认覆盖常见项目，可按需增删；
 TOML 支持 `#` 注释，可按需启用/关闭字段，也可以通过 `--config=...` 指向其他 TOML/JSON 文件。
 
 运行时只需覆盖想临时调整的字段（TOML 支持 `#` 注释，方便禁用配置）：
@@ -115,6 +119,7 @@ python -m data_sources.earnings_to_calendar --config=config/earnings_to_calendar
 - `domain.py`：`EarningsEvent` 模型及去重、日期解析工具。
 - `providers.py`：数据源适配层，目前支持 FMP 与 Finnhub。
 - `market_events.py`：生成四巫日 / OPEX / VIX 结算等市场事件。
+- `macro_events.py`：抓取并归一化宏观经济事件（FOMC / CPI / NFP 等）。
 - `settings.py`：解析 `.env`、配置文件与 CLI 参数，产出 `RuntimeOptions`。
 - `runner.py`：主业务编排（拉取数据、写 ICS/Google/iCloud），并输出运行概要。
 - `calendars.py`：ICS 构建与 Google/iCloud 写入逻辑。

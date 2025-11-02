@@ -1,7 +1,7 @@
 # Earnings → Calendar CLI defaults (TOML)
 
 # 需要抓取的股票列表，可随时注释/调整
-symbols = ["CRWV", "META", "AAPL", "COIN", "NBIS", "ORCL", "HOOD", "PLTR", "OKLO", "AVGO", "CRCL", "TSLA", "FLNC", "GOOG", "RKLB", "MSFT", "NVDA"]
+symbols = ["CRWV", "META","TSM" ,"PL", "SOFI","AAPL", "COIN", "NBIS", "ORCL","IBKR","SNOW", "XYZ","MRVL","HOOD", "PLTR", "OKLO", "AVGO", "CRCL", "TSLA", "FLNC", "GOOG", "RKLB", "MSFT", "NVDA"]
 
 # 数据来源 (fmp 或 finnhub)
 source = "fmp"
@@ -32,6 +32,10 @@ event_duration_minutes = 60
 
 # 是否添加市场事件（四巫日 / OPEX / VIX）
 market_events = true
+
+# 是否添加宏观事件（FOMC / CPI / NFP 等）
+macro_events = false
+macro_event_keywords = ["FOMC", "ECB", "BOE", "BOJ", "CPI", "PPI", "NFP", "Retail Sales", "ISM", "Treasury"]
 
 # 会话时间映射，可根据需要覆盖（BMO=盘前, AMC=盘后）
 [session_times]
