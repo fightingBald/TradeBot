@@ -633,6 +633,38 @@ def main(args: Sequence[str] | None = None) -> None:
             options.google_credentials,
             options.google_token,
         )
+        if unique_events:
+            fallback_tz = ZoneInfo(options.target_timezone)
+
+            def _event_sort_key(item: EarningsEvent) -> tuple[date, datetime, str]:
+                start = item.start_at
+                if start is None:
+                    start = datetime.combine(item.date, time.min, tzinfo=fallback_tz)
+                return (item.date, start, item.symbol)
+
+            sorted_events = sorted(
+                unique_events,
+                key=_event_sort_key,
+            )
+            lines = []
+            for event in sorted_events:
+                start_repr = event.start_at.isoformat() if event.start_at else "-"
+                end_repr = event.end_at.isoformat() if event.end_at else "-"
+                session_repr = event.session or "-"
+                notes_repr = event.notes or "-"
+                timezone_repr = event.timezone or "-"
+                lines.append(
+                    f"{event.iso_date} | {event.symbol:<8} | session={session_repr:<8} | "
+                    f"start={start_repr} | end={end_repr} | tz={timezone_repr} | "
+                    f"source={event.source or '-'} | notes={notes_repr}"
+                )
+            logger.info(
+                "Google Calendar 待写入事件（%d 条）：\n%s",
+                len(sorted_events),
+                "\n".join(f"  {line}" for line in lines),
+            )
+        else:
+            logger.info("Google Calendar 待写入事件：0 条")
         target_calendar_id = google_insert(
             unique_events,
             calendar_id=options.google_calendar_id,

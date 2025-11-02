@@ -9,6 +9,20 @@ source = "fmp"
 # 查询天数（今天起算）
 days = 180
 
+
+# 打开写入 Google Calendar
+google_insert = true
+google_credentials = "secrets/credentials.json"
+google_token = "secrets/token.json"
+google_calendar_name = "Company Earnings"
+google_create_calendar = true
+
+# iCloud CalDAV 参数（按需启用）
+#icloud_insert = false
+#icloud_id = "user@icloud.com"
+#icloud_app_pass = ""
+
+
 # 来源与目标时区设置（IANA 时区名）
 source_timezone = "America/New_York"
 target_timezone = "America/New_York"
@@ -23,15 +37,3 @@ market_events = true
 [session_times]
 BMO = "08:00"
 AMC = "17:00"
-
-# 打开写入 Google Calendar
-google_insert = true
-google_credentials = "secrets/credentials.json"
-google_token = "secrets/token.json"
-google_calendar_name = "Company Earnings"
-google_create_calendar = true
-
-# iCloud CalDAV 参数（按需启用）
-#icloud_insert = false
-#icloud_id = "user@icloud.com"
-#icloud_app_pass = ""
