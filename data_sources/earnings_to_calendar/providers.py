@@ -122,7 +122,13 @@ class FmpEarningsProvider(EarningsDataProvider):
         if df.empty:
             return []
 
-        date_values = df.get("date").fillna(df.get("earningsDate"))
+        date_col = df.get("date")
+        data = date_col if date_col is not None else pd.Series([None] * len(df))
+        if "earningsDate" in df.columns:
+            fallback = df["earningsDate"]
+        else:
+            fallback = pd.Series([None] * len(df))
+        date_values = data.where(data.notna(), fallback)
         df["date"] = pd.to_datetime(date_values, errors="coerce").dt.date
         df = df.dropna(subset=["date"])
         if df.empty:
