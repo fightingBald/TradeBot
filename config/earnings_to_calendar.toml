@@ -1,13 +1,13 @@
 # Earnings → Calendar CLI defaults (TOML)
 
 # 需要抓取的股票列表，可随时注释/调整
-symbols = ["CRWV", "META", "AAPL", "ORCL", "PLTR", "OKLO", "AVGO", "CRCL", "TSLA", "FLNC", "GOOG", "RKLB", "MSFT", "NVDA"]
+symbols = ["CRWV", "META", "AAPL", "COIN", "NBIS","ORCL", "HOOD","PLTR", "OKLO", "AVGO", "CRCL", "TSLA", "FLNC", "GOOG", "RKLB", "MSFT", "NVDA"]
 
 # 数据来源 (fmp 或 finnhub)
 source = "fmp"
 
 # 查询天数（今天起算）
-days = 180
+days = 365
 
 # 打开写入 Google Calendar（若想关闭，可以注释下面几行）
 google_insert = true
