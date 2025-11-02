@@ -1,6 +1,6 @@
 import json
 import os
-from datetime import date
+from datetime import date, datetime, timedelta
 from types import SimpleNamespace
 from pathlib import Path
 
@@ -16,12 +16,19 @@ from data_sources.earnings_to_calendar import (
     deduplicate_events,
     _parse_symbols,
 )
+from data_sources.earnings_to_calendar.defaults import (
+    DEFAULT_EVENT_DURATION_MINUTES,
+    DEFAULT_SESSION_TIMES,
+    DEFAULT_SOURCE_TIMEZONE,
+    DEFAULT_TARGET_TIMEZONE,
+)
 from data_sources.earnings_to_calendar.cli import (
     _build_runtime_options,
     _load_config,
     _load_env_file,
 )
 import data_sources.earnings_to_calendar.calendars as calendars_mod
+from zoneinfo import ZoneInfo
 
 
 class StubResponse:
@@ -140,15 +147,25 @@ def test_fmp_provider_filters_and_normalizes(monkeypatch):
         fake_httpx_get,
     )
 
-    provider = FmpEarningsProvider("token")
+    provider = FmpEarningsProvider(
+        "token",
+        source_timezone=DEFAULT_SOURCE_TIMEZONE,
+        session_times=DEFAULT_SESSION_TIMES,
+        event_duration_minutes=DEFAULT_EVENT_DURATION_MINUTES,
+    )
     events = provider.fetch(["AAPL", "MSFT"], date(2024, 1, 1), date(2024, 1, 31))
 
     assert captured["headers"]["User-Agent"] == "earnings-to-calendar/1.0"
     assert "from=2024-01-01" in captured["url"]
     assert "to=2024-01-31" in captured["url"]
     assert len(events) == 2
-    assert events[0] == EarningsEvent(symbol="AAPL", date=date(2024, 1, 25), session="AMC", source="FMP")
-    assert events[1] == EarningsEvent(symbol="MSFT", date=date(2024, 1, 30), source="FMP")
+    ny = ZoneInfo("America/New_York")
+    assert events[0].start_at == datetime(2024, 1, 25, 17, 0, tzinfo=ny)
+    assert events[0].end_at == events[0].start_at + timedelta(minutes=DEFAULT_EVENT_DURATION_MINUTES)
+    assert events[0].timezone == "America/New_York"
+    assert events[1].start_at is None
+    assert events[1].end_at is None
+    assert events[1].timezone == "America/New_York"
 
 
 def test_finnhub_provider_handles_nested_payload(monkeypatch):
@@ -164,12 +181,18 @@ def test_finnhub_provider_handles_nested_payload(monkeypatch):
         lambda url, *, headers, timeout: StubResponse(payload),
     )
 
-    provider = FinnhubEarningsProvider("token")
+    provider = FinnhubEarningsProvider(
+        "token",
+        source_timezone=DEFAULT_SOURCE_TIMEZONE,
+        session_times=DEFAULT_SESSION_TIMES,
+        event_duration_minutes=DEFAULT_EVENT_DURATION_MINUTES,
+    )
     events = provider.fetch(["AAPL", "GOOGL"], date(2024, 1, 1), date(2024, 1, 31))
 
-    assert events == [
-        EarningsEvent(symbol="AAPL", date=date(2024, 1, 25), session="BMO", source="Finnhub"),
-    ]
+    assert len(events) == 1
+    ny = ZoneInfo("America/New_York")
+    assert events[0].start_at == datetime(2024, 1, 25, 8, 0, tzinfo=ny)
+    assert events[0].end_at == events[0].start_at + timedelta(minutes=DEFAULT_EVENT_DURATION_MINUTES)
 
 
 def test_deduplicate_events_preserves_first_occurrence():
@@ -183,13 +206,30 @@ def test_deduplicate_events_preserves_first_occurrence():
 
 
 def test_build_ics_generates_expected_fields():
-    event = EarningsEvent(symbol="AAPL", date=date(2024, 1, 25), session="AMC", source="FMP", url="https://example.com")
-    ics = build_ics([event], prodid="-//test//")
+    ny = ZoneInfo("America/New_York")
+    berlin = ZoneInfo("Europe/Berlin")
+    event = EarningsEvent(
+        symbol="AAPL",
+        date=date(2024, 1, 25),
+        session="AMC",
+        source="FMP",
+        url="https://example.com",
+        start_at=datetime(2024, 1, 25, 17, 0, tzinfo=ny),
+        end_at=datetime(2024, 1, 25, 18, 0, tzinfo=ny),
+    )
+    ics = build_ics(
+        [event],
+        prodid="-//test//",
+        target_timezone=berlin.key,
+        default_duration_minutes=90,
+    )
 
     assert "PRODID:-//test//" in ics
     assert "SUMMARY:AAPL Earnings (AMC)" in ics
     assert "DESCRIPTION:Earnings date from FMP." in ics
     assert "URL:https://example.com" in ics
+    assert "DTSTART;TZID=Europe/Berlin:20240125T230000" in ics
+    assert "DTEND;TZID=Europe/Berlin:20240126T000000" in ics
 
 
 @pytest.mark.parametrize(
@@ -271,6 +311,10 @@ def test_build_runtime_options_merges_config(tmp_path, monkeypatch):
         "google_token": "cfg_token.json",
         "google_calendar_name": "Company Earnings",
         "google_create_calendar": True,
+        "source_timezone": "America/New_York",
+        "target_timezone": "Europe/Berlin",
+        "event_duration_minutes": "90",
+        "session_times": {"BMO": "07:30", "AMC": "18:45"},
         "icloud_insert": True,
         "icloud_id": "user@icloud.com",
         "icloud_app_pass": "abcd-efgh",
@@ -287,6 +331,10 @@ def test_build_runtime_options_merges_config(tmp_path, monkeypatch):
         google_calendar_id=None,
         google_calendar_name=None,
         google_create_calendar=False,
+        source_tz=None,
+        target_tz=None,
+        event_duration=None,
+        session_times=None,
         icloud_insert=False,
         icloud_id=None,
         icloud_app_pass=None,
@@ -312,6 +360,10 @@ def test_build_runtime_options_merges_config(tmp_path, monkeypatch):
     assert options.google_calendar_id is None
     assert options.google_calendar_name == "Company Earnings"
     assert options.google_create_calendar is True
+    assert options.source_timezone == "America/New_York"
+    assert options.target_timezone == "Europe/Berlin"
+    assert options.event_duration_minutes == 90
+    assert options.session_time_map == {"BMO": "07:30", "AMC": "18:45"}
     assert options.icloud_insert is True
     assert options.icloud_id == "user@icloud.com"
     assert options.icloud_app_pass == "abcd-efgh"
@@ -349,6 +401,10 @@ def test_build_runtime_options_cli_overrides_config(tmp_path, monkeypatch):
         google_calendar_id="custom-id",
         google_calendar_name=None,
         google_create_calendar=True,
+        source_tz="America/Chicago",
+        target_tz=None,
+        event_duration=None,
+        session_times=None,
         icloud_insert=False,
         icloud_id=None,
         icloud_app_pass=None,
@@ -371,6 +427,10 @@ def test_build_runtime_options_cli_overrides_config(tmp_path, monkeypatch):
     assert options.google_calendar_id == "custom-id"
     assert options.google_calendar_name is None
     assert options.google_create_calendar is True
+    assert options.source_timezone == "America/Chicago"
+    assert options.target_timezone == DEFAULT_TARGET_TIMEZONE
+    assert options.event_duration_minutes == DEFAULT_EVENT_DURATION_MINUTES
+    assert options.session_time_map == DEFAULT_SESSION_TIMES
 
 
 def test_build_runtime_options_uses_env_defaults(tmp_path, monkeypatch):
@@ -389,6 +449,10 @@ def test_build_runtime_options_uses_env_defaults(tmp_path, monkeypatch):
     monkeypatch.setenv("GOOGLE_INSERT", "true")
     monkeypatch.setenv("GOOGLE_CALENDAR_NAME", "Company Earnings")
     monkeypatch.setenv("GOOGLE_CREATE_CALENDAR", "1")
+    monkeypatch.setenv("SOURCE_TIMEZONE", "America/New_York")
+    monkeypatch.setenv("TARGET_TIMEZONE", "Asia/Shanghai")
+    monkeypatch.setenv("EVENT_DURATION_MINUTES", "75")
+    monkeypatch.setenv("SESSION_TIMES", "BMO=07:45,AMC=19:00")
     monkeypatch.setenv("ICLOUD_INSERT", "1")
     monkeypatch.setenv("ICLOUD_APPLE_ID", "user@icloud.com")
     monkeypatch.setenv("ICLOUD_APP_PASSWORD", "pass-1234")
@@ -404,6 +468,10 @@ def test_build_runtime_options_uses_env_defaults(tmp_path, monkeypatch):
         google_calendar_id=None,
         google_calendar_name=None,
         google_create_calendar=False,
+        source_tz=None,
+        target_tz=None,
+        event_duration=None,
+        session_times=None,
         icloud_insert=False,
         icloud_id=None,
         icloud_app_pass=None,
@@ -427,6 +495,10 @@ def test_build_runtime_options_uses_env_defaults(tmp_path, monkeypatch):
     assert options.google_insert is True
     assert options.google_calendar_name == "Company Earnings"
     assert options.google_create_calendar is True
+    assert options.source_timezone == "America/New_York"
+    assert options.target_timezone == "Asia/Shanghai"
+    assert options.event_duration_minutes == 75
+    assert options.session_time_map == {"BMO": "07:45", "AMC": "19:00"}
     assert options.icloud_insert is True
     assert options.icloud_id == "user@icloud.com"
     assert options.icloud_app_pass == "pass-1234"
@@ -455,6 +527,10 @@ def test_build_runtime_options_resolves_paths_relative_to_config(tmp_path, monke
         google_calendar_id=None,
         google_calendar_name=None,
         google_create_calendar=False,
+        source_tz=None,
+        target_tz=None,
+        event_duration=None,
+        session_times=None,
         icloud_insert=False,
         icloud_id=None,
         icloud_app_pass=None,
@@ -470,13 +546,26 @@ def test_build_runtime_options_resolves_paths_relative_to_config(tmp_path, monke
     assert options.google_credentials == str(config_base / "secrets/credentials.json")
     assert options.google_token == str(config_base / "secrets/token.json")
     assert options.google_calendar_id == "primary"
+    assert options.source_timezone == DEFAULT_SOURCE_TIMEZONE
+    assert options.target_timezone == DEFAULT_TARGET_TIMEZONE
+    assert options.event_duration_minutes == DEFAULT_EVENT_DURATION_MINUTES
+    assert options.session_time_map == DEFAULT_SESSION_TIMES
 
 
 def test_google_insert_creates_calendar_when_missing(monkeypatch):
     service = StubGoogleService()
     monkeypatch.setattr(calendars_mod, "_get_google_service", lambda *args, **kwargs: service)
 
-    event = EarningsEvent(symbol="AAPL", date=date(2024, 5, 1), session="AMC", source="FMP")
+    ny = ZoneInfo("America/New_York")
+    event = EarningsEvent(
+        symbol="AAPL",
+        date=date(2024, 5, 1),
+        session="AMC",
+        source="FMP",
+        start_at=datetime(2024, 5, 1, 17, 0, tzinfo=ny),
+        end_at=datetime(2024, 5, 1, 18, 0, tzinfo=ny),
+        timezone="America/New_York",
+    )
 
     calendar_id = calendars_mod.google_insert(
         [event],
@@ -485,43 +574,71 @@ def test_google_insert_creates_calendar_when_missing(monkeypatch):
         token_path="token.json",
         calendar_name="Company Earnings",
         create_if_missing=True,
+        target_timezone="Europe/Berlin",
+        default_duration_minutes=75,
     )
 
     assert calendar_id in service.calendars_data
     assert service.calendars_data[calendar_id] == "Company Earnings"
     assert len(service.calendar_inserts) == 1
     assert len(service.events_data[calendar_id]) == 1
+    stored_event = service.events_data[calendar_id][0]
+    assert "dateTime" in stored_event["start"]
+    assert stored_event["start"]["timeZone"] == "Europe/Berlin"
 
 
 def test_google_insert_upserts_existing(monkeypatch):
     service = StubGoogleService({"primary": "Primary"})
     monkeypatch.setattr(calendars_mod, "_get_google_service", lambda *args, **kwargs: service)
 
-    base_event = EarningsEvent(symbol="MSFT", date=date(2024, 6, 10), session="BMO", source="FMP")
+    ny = ZoneInfo("America/New_York")
+    base_event = EarningsEvent(
+        symbol="MSFT",
+        date=date(2024, 6, 10),
+        session="BMO",
+        source="FMP",
+        start_at=datetime(2024, 6, 10, 8, 0, tzinfo=ny),
+        end_at=datetime(2024, 6, 10, 9, 0, tzinfo=ny),
+        timezone="America/New_York",
+    )
 
     calendars_mod.google_insert(
         [base_event],
         calendar_id="primary",
         creds_path="cred.json",
         token_path="token.json",
+        target_timezone="America/Chicago",
+        default_duration_minutes=45,
     )
 
     assert len(service.events_data["primary"]) == 1
     first_event = service.events_data["primary"][0]
     event_id = first_event["id"]
 
-    updated_event = EarningsEvent(symbol="MSFT", date=date(2024, 6, 10), session="BMO", source="FMP", notes="Updated desc")
+    updated_event = EarningsEvent(
+        symbol="MSFT",
+        date=date(2024, 6, 10),
+        session="BMO",
+        source="FMP",
+        notes="Updated desc",
+        start_at=datetime(2024, 6, 10, 8, 0, tzinfo=ny),
+        end_at=datetime(2024, 6, 10, 9, 0, tzinfo=ny),
+        timezone="America/New_York",
+    )
 
     calendars_mod.google_insert(
         [updated_event],
         calendar_id="primary",
         creds_path="cred.json",
         token_path="token.json",
+        target_timezone="America/Chicago",
+        default_duration_minutes=45,
     )
 
     assert len(service.events_data["primary"]) == 1
     stored_event = service.events_data["primary"][0]
     assert stored_event["id"] == event_id
     assert "Updated desc" in stored_event["description"]
+    assert stored_event["start"]["timeZone"] == "America/Chicago"
     assert len(service.insert_calls) == 1
     assert len(service.update_calls) == 1

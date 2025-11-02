@@ -47,7 +47,11 @@ python -m data_sources.earnings_to_calendar \
 
 ## 配置文件（可选）
 
-命令默认读取 `config/earnings_to_calendar.toml`，TOML 支持 `#` 注释，可按需启用/注释字段，也可以通过 `--config=...` 指向其他 TOML/JSON 文件。
+命令默认读取 `config/earnings_to_calendar.toml`（首次运行会自动生成模板），其中可配置：
+- `source_timezone` / `target_timezone`：数据源时区与日历写入时区；
+- `event_duration_minutes`：默认事件时长（分钟）；
+- `[session_times]`：将诸如 `BMO`、`AMC` 映射到具体时间；
+TOML 支持 `#` 注释，可按需启用/关闭字段，也可以通过 `--config=...` 指向其他 TOML/JSON 文件。
 
 运行时只需覆盖想临时调整的字段（TOML 支持 `#` 注释，方便禁用配置）：
 ```bash

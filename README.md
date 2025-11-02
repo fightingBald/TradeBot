@@ -78,7 +78,7 @@ Once running, the API provides:
 
 ## Data Utilities
 
-- `data_sources/earnings_to_calendar` 提供了一个模块化的 CLI/库，用于从 FMP 或 Finnhub 抓取财报日程并导出到 ICS、Google Calendar 或 iCloud。运行 `python -m data_sources.earnings_to_calendar --help` 查看可用参数。默认配置集中在 `config/earnings_to_calendar.toml`（TOML，支持注释），也可以通过 `--config=...` 指向其他文件。敏感信息建议写在 `.env`（参考 `.env.example`），CLI 会自动加载，也可以用 `--env-file` 指向其他路径。需要调试时可加 `--log-level=DEBUG`；要写入指定日历可传 `--google-calendar-name "Company Earnings" --google-create-calendar`，或直接提供 `--google-calendar-id`。
+- `data_sources/earnings_to_calendar` 提供了一个模块化的 CLI/库，用于从 FMP 或 Finnhub 抓取财报日程并导出到 ICS、Google Calendar 或 iCloud。运行 `python -m data_sources.earnings_to_calendar --help` 查看可用参数。默认配置集中在 `config/earnings_to_calendar.toml`（可设置 `source_timezone`、`target_timezone`、`event_duration_minutes` 以及 `session_times` 等），也可以通过 `--config=...` 指向其他文件。敏感信息建议写在 `.env`（参考 `.env.example`），CLI 会自动加载，也可以用 `--env-file` 指向其他路径。需要调试时可加 `--log-level=DEBUG`；要写入指定日历可传 `--google-calendar-name "Company Earnings" --google-create-calendar`，或直接提供 `--google-calendar-id`。
   ```bash
   cd /path/to/AlpacaTrading
   python -m data_sources.earnings_to_calendar \

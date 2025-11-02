@@ -6,7 +6,9 @@ import os
 import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Dict, Optional, Sequence
+from zoneinfo import ZoneInfo
 
+from .defaults import DEFAULT_EVENT_DURATION_MINUTES, DEFAULT_TARGET_TIMEZONE
 from .domain import EarningsEvent
 from .logging_utils import get_logger
 
@@ -23,8 +25,15 @@ def _ics_escape(text: str) -> str:
     )
 
 
-def build_ics(events: Sequence[EarningsEvent], prodid: str = "-//earnings-to-calendar//") -> str:
+def build_ics(
+    events: Sequence[EarningsEvent],
+    prodid: str = "-//earnings-to-calendar//",
+    *,
+    target_timezone: str = DEFAULT_TARGET_TIMEZONE,
+    default_duration_minutes: int = DEFAULT_EVENT_DURATION_MINUTES,
+) -> str:
     now = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    tz = ZoneInfo(target_timezone)
     lines = [
         "BEGIN:VCALENDAR",
         "VERSION:2.0",
@@ -33,20 +42,38 @@ def build_ics(events: Sequence[EarningsEvent], prodid: str = "-//earnings-to-cal
         "METHOD:PUBLISH",
     ]
     for event in events:
-        dtstart = event.date.strftime("%Y%m%d")
         uid = f"{uuid.uuid4()}@earnings"
-        lines.extend(
-            [
-                "BEGIN:VEVENT",
-                f"UID:{uid}",
-                f"DTSTAMP:{now}",
-                f"SUMMARY:{_ics_escape(event.summary())}",
-                f"DTSTART;VALUE=DATE:{dtstart}",
-                f"DESCRIPTION:{_ics_escape(event.description())}",
-                "TRANSP:TRANSPARENT",
-                "STATUS:CONFIRMED",
-            ]
-        )
+        if event.start_at:
+            start_local = event.start_at.astimezone(tz)
+            end_source = event.end_at or (event.start_at + timedelta(minutes=default_duration_minutes))
+            end_local = end_source.astimezone(tz)
+            lines.extend(
+                [
+                    "BEGIN:VEVENT",
+                    f"UID:{uid}",
+                    f"DTSTAMP:{now}",
+                    f"SUMMARY:{_ics_escape(event.summary())}",
+                    f"DTSTART;TZID={tz.key}:{start_local.strftime('%Y%m%dT%H%M%S')}",
+                    f"DTEND;TZID={tz.key}:{end_local.strftime('%Y%m%dT%H%M%S')}",
+                    f"DESCRIPTION:{_ics_escape(event.description())}",
+                    "TRANSP:OPAQUE",
+                    "STATUS:CONFIRMED",
+                ]
+            )
+        else:
+            dtstart = event.date.strftime("%Y%m%d")
+            lines.extend(
+                [
+                    "BEGIN:VEVENT",
+                    f"UID:{uid}",
+                    f"DTSTAMP:{now}",
+                    f"SUMMARY:{_ics_escape(event.summary())}",
+                    f"DTSTART;VALUE=DATE:{dtstart}",
+                    f"DESCRIPTION:{_ics_escape(event.description())}",
+                    "TRANSP:TRANSPARENT",
+                    "STATUS:CONFIRMED",
+                ]
+            )
         if event.url:
             lines.append(f"URL:{_ics_escape(event.url)}")
         lines.extend(
@@ -136,14 +163,19 @@ def _earnings_key(event: EarningsEvent) -> str:
     return f"{event.symbol.upper()}::{event.iso_date}::{session}"
 
 
-def _build_google_event_body(event: EarningsEvent) -> Dict[str, object]:
+def _build_google_event_body(
+    event: EarningsEvent,
+    *,
+    start_local: Optional[datetime],
+    end_local: Optional[datetime],
+    target_tz: ZoneInfo,
+    default_duration_minutes: int,
+) -> Dict[str, object]:
     end_date = event.date + timedelta(days=1)
     key = _earnings_key(event)
     body: Dict[str, object] = {
         "summary": event.summary(),
         "description": event.description(),
-        "start": {"date": event.iso_date},
-        "end": {"date": end_date.strftime("%Y-%m-%d")},
         "transparency": "transparent",
         "reminders": {
             "useDefault": False,
@@ -160,6 +192,13 @@ def _build_google_event_body(event: EarningsEvent) -> Dict[str, object]:
             }
         },
     }
+    if start_local:
+        end_local = end_local or (start_local + timedelta(minutes=default_duration_minutes))
+        body["start"] = {"dateTime": start_local.isoformat(), "timeZone": target_tz.key}
+        body["end"] = {"dateTime": end_local.isoformat(), "timeZone": target_tz.key}
+    else:
+        body["start"] = {"date": event.iso_date}
+        body["end"] = {"date": end_date.strftime("%Y-%m-%d")}
     if event.url:
         body["source"] = {"title": event.source or "source", "url": event.url}
     return body
@@ -173,15 +212,32 @@ def google_insert(
     *,
     calendar_name: str | None = None,
     create_if_missing: bool = False,
+    target_timezone: str = DEFAULT_TARGET_TIMEZONE,
+    default_duration_minutes: int = DEFAULT_EVENT_DURATION_MINUTES,
 ) -> str:
     """Insert or update earnings events into Google Calendar."""
 
     service = _get_google_service(creds_path, token_path)
     target_calendar_id = _ensure_calendar(service, calendar_id, calendar_name, create_if_missing)
+    target_tz = ZoneInfo(target_timezone)
 
     for event in events:
         key = _earnings_key(event)
-        event_body = _build_google_event_body(event)
+        if event.start_at:
+            end_source = event.end_at or (event.start_at + timedelta(minutes=default_duration_minutes))
+            start_local = event.start_at.astimezone(target_tz)
+            end_local = end_source.astimezone(target_tz)
+        else:
+            start_local = None
+            end_local = None
+
+        event_body = _build_google_event_body(
+            event,
+            start_local=start_local,
+            end_local=end_local,
+            target_tz=target_tz,
+            default_duration_minutes=default_duration_minutes,
+        )
 
         existing = (
             service.events()

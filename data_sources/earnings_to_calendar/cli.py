@@ -15,7 +15,15 @@ from typing import Any, Dict, Iterable, List, Mapping, Sequence
 import logging
 
 from .calendars import build_ics, google_insert, icloud_caldav_insert
-from .config import DEFAULT_LOOKAHEAD_DAYS
+from .defaults import (
+    DEFAULT_EVENT_DURATION_MINUTES,
+    DEFAULT_LOOKAHEAD_DAYS,
+    DEFAULT_SESSION_TIMES,
+    DEFAULT_SOURCE_TIMEZONE,
+    DEFAULT_TARGET_TIMEZONE,
+    DEFAULT_TIMEOUT_SECONDS,
+    USER_AGENT,
+)
 from .domain import deduplicate_events
 from .logging_utils import LOGGER_NAME, get_logger
 from .providers import PROVIDERS, EarningsDataProvider
@@ -25,12 +33,41 @@ _DEFAULT_GOOGLE_CREDENTIALS = "credentials.json"
 _DEFAULT_GOOGLE_TOKEN = "token.json"
 _DEFAULT_ENV_FILE = ".env"
 
+CONFIG_TEMPLATE = """# Earnings → Calendar CLI defaults (TOML)
+
+# 需要抓取的股票列表，可随时注释/调整
+symbols = ["AAPL", "MSFT", "NVDA"]
+
+# 数据来源 (fmp 或 finnhub)
+source = "fmp"
+
+# 查询天数（今天起算）
+days = 120
+
+# 来源与目标时区设置（IANA 时区名）
+source_timezone = "America/New_York"
+target_timezone = "America/New_York"
+
+# 若日历要使用定时事件，可调整时长（单位：分钟）
+event_duration_minutes = 60
+
+# 会话时间映射，可根据需要覆盖（BMO=盘前, AMC=盘后）
+[session_times]
+BMO = "08:00"
+AMC = "17:00"
+"""
+
+
 _ENV_KEY_GOOGLE_CREDENTIALS = "GOOGLE_CREDENTIALS_PATH"
 _ENV_KEY_GOOGLE_TOKEN = "GOOGLE_TOKEN_PATH"
 _ENV_KEY_GOOGLE_INSERT = "GOOGLE_INSERT"
 _ENV_KEY_GOOGLE_CALENDAR_ID = "GOOGLE_CALENDAR_ID"
 _ENV_KEY_GOOGLE_CALENDAR_NAME = "GOOGLE_CALENDAR_NAME"
 _ENV_KEY_GOOGLE_CREATE_CAL = "GOOGLE_CREATE_CALENDAR"
+_ENV_KEY_SOURCE_TZ = "SOURCE_TIMEZONE"
+_ENV_KEY_TARGET_TZ = "TARGET_TIMEZONE"
+_ENV_KEY_EVENT_DURATION = "EVENT_DURATION_MINUTES"
+_ENV_KEY_SESSION_TIMES = "SESSION_TIMES"
 _ENV_KEY_ICLOUD_INSERT = "ICLOUD_INSERT"
 _ENV_KEY_ICLOUD_ID = "ICLOUD_APPLE_ID"
 _ENV_KEY_ICLOUD_APP_PASS = "ICLOUD_APP_PASSWORD"
@@ -50,19 +87,31 @@ class RuntimeOptions:
     google_calendar_id: str | None
     google_calendar_name: str | None
     google_create_calendar: bool
+    source_timezone: str
+    target_timezone: str
+    event_duration_minutes: int
+    session_time_map: Dict[str, str]
     icloud_insert: bool
     icloud_id: str | None
     icloud_app_pass: str | None
 
 
-def _resolve_provider(source: str) -> EarningsDataProvider:
+def _resolve_provider(source: str, options: RuntimeOptions) -> EarningsDataProvider:
     if source not in PROVIDERS:
         raise ValueError(f"Unsupported data source: {source}")
     env_var = "FMP_API_KEY" if source == "fmp" else "FINNHUB_API_KEY"
     api_key = os.getenv(env_var)
     if not api_key:
         logger.error("环境变量 %s 未配置，无法使用数据源 %s", env_var, source)
-    return PROVIDERS[source](api_key)
+        raise RuntimeError(f"缺少 {env_var}")
+
+    provider_cls = PROVIDERS[source]
+    return provider_cls(
+        api_key,
+        source_timezone=options.source_timezone,
+        session_times=options.session_time_map,
+        event_duration_minutes=options.event_duration_minutes,
+    )
 
 
 def _parse_symbols(raw: Iterable[str]) -> List[str]:
@@ -108,17 +157,26 @@ def _load_env_file(path: str | None, *, search_root: Path | None = None) -> None
 
 
 def _load_config(config_path: str | None, default_path: Path | None = None) -> tuple[Dict[str, Any], Path | None]:
-    target_path: Path | None = None
+    cfg_path: Path | None = None
+    create_template = False
     if config_path:
-        target_path = Path(config_path)
-    elif default_path and default_path.exists():
-        target_path = default_path
+        cfg_path = Path(config_path)
+    elif default_path:
+        cfg_path = default_path
+        create_template = True
 
-    if target_path is None:
+    if cfg_path is None:
         logger.debug("未指定配置文件，返回空配置")
         return {}, None
 
-    cfg_path = target_path
+    if not cfg_path.exists():
+        if create_template:
+            cfg_path.parent.mkdir(parents=True, exist_ok=True)
+            cfg_path.write_text(CONFIG_TEMPLATE)
+            logger.info("已生成默认配置文件：%s", cfg_path)
+        else:
+            raise RuntimeError(f"找不到配置文件：{cfg_path}")
+
     try:
         if cfg_path.suffix.lower() == ".toml":
             with cfg_path.open("rb") as handle:
@@ -130,8 +188,6 @@ def _load_config(config_path: str | None, default_path: Path | None = None) -> t
             raise ValueError("配置文件必须是对象/表结构")
         logger.info("已加载配置文件：%s", cfg_path)
         return dict(data), cfg_path.parent
-    except FileNotFoundError as exc:
-        raise RuntimeError(f"找不到配置文件：{config_path}") from exc
     except json.JSONDecodeError as exc:
         raise RuntimeError(f"配置文件解析失败：{config_path}") from exc
     except tomllib.TOMLDecodeError as exc:
@@ -173,6 +229,27 @@ def _coerce_bool(value: Any) -> bool | None:
         if normalized in {"0", "false", "no", "n", "off"}:
             return False
     raise ValueError("布尔配置必须是 true/false 或 1/0")
+
+
+def _parse_session_times(value: Any, default: Dict[str, str]) -> Dict[str, str]:
+    if value is None:
+        return {k.upper(): v for k, v in default.items()}
+    if isinstance(value, dict):
+        return {str(k).upper(): str(v) for k, v in value.items()}
+    if isinstance(value, str):
+        entries = {}
+        for part in value.split(","):
+            if "=" not in part:
+                continue
+            key, time_str = part.split("=", 1)
+            key = key.strip().upper()
+            time_str = time_str.strip()
+            if key and time_str:
+                entries[key] = time_str
+        if entries:
+            return entries
+        raise ValueError("session_times 字符串需形如 BMO=08:00,AMC=17:00")
+    raise ValueError("session_times 必须是对象或逗号分隔的 k=v 字符串")
 
 
 def _resolve_path(value: Any, *, base: Path | None, root: Path) -> str | None:
@@ -279,6 +356,39 @@ def _build_runtime_options(
             env_create_flag = _coerce_bool(os.getenv(_ENV_KEY_GOOGLE_CREATE_CAL))
             google_create_calendar = env_create_flag if env_create_flag is not None else False
 
+    source_timezone = (
+        parsed.source_tz
+        or config.get("source_timezone")
+        or os.getenv(_ENV_KEY_SOURCE_TZ)
+        or DEFAULT_SOURCE_TIMEZONE
+    )
+
+    target_timezone = (
+        parsed.target_tz
+        or config.get("target_timezone")
+        or os.getenv(_ENV_KEY_TARGET_TZ)
+        or DEFAULT_TARGET_TIMEZONE
+    )
+
+    event_duration = (
+        parsed.event_duration
+        if parsed.event_duration is not None
+        else (
+            _coerce_int(config.get("event_duration_minutes"), field="event_duration_minutes")
+            if "event_duration_minutes" in config
+            else int(os.getenv(_ENV_KEY_EVENT_DURATION) or DEFAULT_EVENT_DURATION_MINUTES)
+        )
+    )
+    if event_duration <= 0:
+        raise ValueError("event_duration_minutes 必须为正整数")
+
+    session_time_map = _parse_session_times(
+        parsed.session_times
+        or config.get("session_times")
+        or os.getenv(_ENV_KEY_SESSION_TIMES),
+        default=DEFAULT_SESSION_TIMES,
+    )
+
     if parsed.google_insert:
         google_insert = True
     else:
@@ -319,6 +429,10 @@ def _build_runtime_options(
         google_calendar_id=str(google_calendar_id) if google_calendar_id is not None else None,
         google_calendar_name=google_calendar_name,
         google_create_calendar=google_create_calendar,
+        source_timezone=str(source_timezone),
+        target_timezone=str(target_timezone),
+        event_duration_minutes=event_duration,
+        session_time_map=session_time_map,
         icloud_insert=icloud_insert,
         icloud_id=str(icloud_id) if icloud_id is not None else None,
         icloud_app_pass=str(icloud_app_pass) if icloud_app_pass is not None else None,
@@ -339,6 +453,10 @@ def main(args: Sequence[str] | None = None) -> None:
     parser.add_argument("--google-calendar-id", help="Target Google calendarId (default: primary)")
     parser.add_argument("--google-calendar-name", help="Target Google calendar name (used when ID missing)")
     parser.add_argument("--google-create-calendar", action="store_true", help="Create Google Calendar when name not found")
+    parser.add_argument("--source-tz", help="Timezone of source data (e.g. America/New_York)")
+    parser.add_argument("--target-tz", help="Timezone for calendar output (e.g. Europe/Berlin)")
+    parser.add_argument("--event-duration", type=int, help="Duration (minutes) for timed events")
+    parser.add_argument("--session-times", help="Override session times, e.g. BMO=08:00,AMC=17:00")
     parser.add_argument("--icloud-insert", action="store_true", help="Insert to iCloud via CalDAV")
     parser.add_argument("--icloud-id")
     parser.add_argument("--icloud-app-pass")
@@ -377,7 +495,7 @@ def main(args: Sequence[str] | None = None) -> None:
     since = date.today()
     until = since + timedelta(days=options.days)
 
-    provider = _resolve_provider(options.source)
+    provider = _resolve_provider(options.source, options)
     logger.info(
         "开始拉取数据：source=%s symbols=%s 窗口=%s~%s",
         options.source,
@@ -394,7 +512,12 @@ def main(args: Sequence[str] | None = None) -> None:
 
     if options.export_ics:
         logger.info("导出 ICS 文件：%s", options.export_ics)
-        ics_payload = build_ics(unique_events)
+        ics_payload = build_ics(
+            unique_events,
+            prodid="-//earnings-to-calendar//",
+            target_timezone=options.target_timezone,
+            default_duration_minutes=options.event_duration_minutes,
+        )
         with open(options.export_ics, "w", encoding="utf-8") as file_obj:
             file_obj.write(ics_payload)
         print(f"ICS 已导出：{options.export_ics}")
@@ -415,6 +538,8 @@ def main(args: Sequence[str] | None = None) -> None:
             token_path=options.google_token,
             calendar_name=options.google_calendar_name,
             create_if_missing=options.google_create_calendar,
+            target_timezone=options.target_timezone,
+            default_duration_minutes=options.event_duration_minutes,
         )
         print(f"已写入 Google Calendar: {target_calendar_id}")
 
