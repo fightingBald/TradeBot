@@ -111,11 +111,14 @@ python -m data_sources.earnings_to_calendar --config=config/earnings_to_calendar
 
 ## 代码结构
 
-- `config.py`：常量配置，如默认天数、请求超时、User-Agent。
+- `defaults.py`：封装默认天数、超时、User-Agent 等常量。
 - `domain.py`：`EarningsEvent` 模型及去重、日期解析工具。
 - `providers.py`：数据源适配层，目前支持 FMP 与 Finnhub。
+- `market_events.py`：生成四巫日 / OPEX / VIX 结算等市场事件。
+- `settings.py`：解析 `.env`、配置文件与 CLI 参数，产出 `RuntimeOptions`。
+- `runner.py`：主业务编排（拉取数据、写 ICS/Google/iCloud），并输出运行概要。
 - `calendars.py`：ICS 构建与 Google/iCloud 写入逻辑。
-- `cli.py`：命令行入口逻辑，可独立调用 `main()`。
+- `cli.py`：命令行入口，负责解析参数与调用 `runner.run()`。
 - `__init__.py`：对外统一导出。
 
 可直接在其他模块中导入：
