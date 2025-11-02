@@ -224,44 +224,6 @@
 
 # LANGUAGE STYLE PACKS（语言风格包）
 
-## A) Go（1.24.x）
-
-* **Formatting/Lint**：`go fmt ./...`、`go vet ./...`、`staticcheck ./...`。
-* **命名**：mixedCaps；接口按能力命名，不加 `I` 前缀；导出最小化。
-* **上下文**：所有外部 I/O 函数首参 `context.Context`，禁止存入结构体。
-* **错误**：包级 sentinel；`fmt.Errorf("op: %w", err)` 包装；HTTP 层统一映射。
-* **接收者**：稳定单字母，如 `(s *Server)`；值/指针接收者遵循可变性与逃逸分析。
-* **并发**：`errgroup`/`context` 控制生命周期；避免无界缓冲；`select` 监听 `ctx.Done()`。
-* **依赖**：路由 `github.com/go-chi/chi/v5`；PG 驱动 `github.com/jackc/pgx/v5`；SQL Builder `github.com/Masterminds/squirrel`；OpenAPI 校验 `github.com/getkin/kin-openapi`；Testcontainers。
-* **API & 生成**：oapi-codegen 开启 `-strict-server`；生成到 `api/gen`；禁止手改。
-* **测试风格（强制）**：
-
-  * 表驱动：`cases := []struct{ name string; in ...; exp ... }{...}`
-  * 子测试：`t.Run(c.name, func(t *testing.T) { c := c; ... })`
-  * 断言：`github.com/stretchr/testify/require`
-  * 集成优先 Testcontainers，HTTP/PG 走真连与隔离资源。
-
-**常见陷阱**
-
-* 在 handler 里起后台 goroutine 且不关联 `ctx`；
-* 拼接 SQL；
-* 把可选参数摊平为长函数签名，优先 Options 模式；
-* 以 `sleep` 凑同步；请用通道/条件或可注入时钟。
-
----
-
-## B) Java（JDK 21）
-
-* **Build**：Gradle 或 Maven，启用 `Werror` 类似的严格模式。
-* **格式**：Google Java Format 或 Spotless；Checkstyle + Error Prone。
-* **命名/结构**：包小写分层清晰；类职责单一；记录类（record）优先装 DTO。
-* **错误**：受检异常仅在边界；业务异常携带语义码；统一 ControllerAdvice 映射。
-* **并发**：虚拟线程/结构化并发优先；CompletableFuture 限定在边界层。
-* **测试**：JUnit 5 + AssertJ + Testcontainers；分层测试夹具；`@Testcontainers`/`@Container` 管理生命周期。
-* **API**：OpenAPI→`springdoc-openapi` 或 Micronaut；生成客户端/服务端 stub。
-
----
-
 ## C) Python（3.12）
 
 * **格式**：`black` + `ruff` + `isort`；类型：`mypy --strict`（合理放宽）。
@@ -269,16 +231,6 @@
 * **异步**：`asyncio` + `anyio`；超时/取消必须；HTTP 用 `httpx`；并发限速与重试回退。
 * **测试**：`pytest` + `pytest-asyncio`；`hypothesis` 可选；Testcontainers for DB/MQ。
 * **配置**：`pydantic-settings`；Secrets 走环境/密管；禁用 `.env` 入库。
-
----
-
-## D) TypeScript / Node（TS 5.x / Node 20）
-
-* **格式**：ESLint（strict）+ Prettier；`tsconfig` 开启 `strict: true`。
-* **运行**：`pnpm` 优先；模块路径别名经 `tsconfig-paths`；生产构建 `tsc` 输出 ESM/CJS 统一约定。
-* **API**：Fastify/Express；输入用 `zod` 或 `valibot` 校验；OpenAPI 生成路由绑定。
-* **测试**：Vitest/Jest；Supertest for HTTP；Testcontainers。
-* **安全**：Helmet/CSP；参数化查询；序列化白名单；避免原型链污染。
 
 ---
 

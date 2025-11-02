@@ -120,32 +120,38 @@ class StubGoogleService:
         return Events()
 
 
-def test_fmp_provider_filters_and_normalizes():
+def test_fmp_provider_filters_and_normalizes(monkeypatch):
     payload = [
         {"symbol": "aapl", "date": "2024-01-25", "time": "AMC"},
         {"symbol": "msft", "earningsDate": "2024-01-30"},
         {"symbol": "tsla", "date": "bad-date"},
     ]
 
-    captured: dict[str, str] = {}
+    captured: dict[str, object] = {}
 
-    def fake_get(url, **kwargs):
+    def fake_httpx_get(url, *, headers, timeout):  # noqa: ANN001
         captured["url"] = url
-        captured["user_agent"] = kwargs["headers"]["User-Agent"]
+        captured["headers"] = headers
+        captured["timeout"] = timeout
         return StubResponse(payload)
 
-    provider = FmpEarningsProvider("token", http_get=fake_get)
+    monkeypatch.setattr(
+        "data_sources.earnings_to_calendar.providers.httpx.get",
+        fake_httpx_get,
+    )
+
+    provider = FmpEarningsProvider("token")
     events = provider.fetch(["AAPL", "MSFT"], date(2024, 1, 1), date(2024, 1, 31))
 
-    assert captured["user_agent"] == "earnings-to-calendar/1.0"
+    assert captured["headers"]["User-Agent"] == "earnings-to-calendar/1.0"
     assert "from=2024-01-01" in captured["url"]
     assert "to=2024-01-31" in captured["url"]
     assert len(events) == 2
-    assert events[0] == EarningsEvent("AAPL", date(2024, 1, 25), "AMC", "FMP")
-    assert events[1] == EarningsEvent("MSFT", date(2024, 1, 30), "", "FMP")
+    assert events[0] == EarningsEvent(symbol="AAPL", date=date(2024, 1, 25), session="AMC", source="FMP")
+    assert events[1] == EarningsEvent(symbol="MSFT", date=date(2024, 1, 30), source="FMP")
 
 
-def test_finnhub_provider_handles_nested_payload():
+def test_finnhub_provider_handles_nested_payload(monkeypatch):
     payload = {
         "earningsCalendar": [
             {"symbol": "AAPL", "date": "2024-01-25", "hour": "bmo"},
@@ -153,21 +159,23 @@ def test_finnhub_provider_handles_nested_payload():
         ]
     }
 
-    def fake_get(url, **kwargs):
-        return StubResponse(payload)
+    monkeypatch.setattr(
+        "data_sources.earnings_to_calendar.providers.httpx.get",
+        lambda url, *, headers, timeout: StubResponse(payload),
+    )
 
-    provider = FinnhubEarningsProvider("token", http_get=fake_get)
+    provider = FinnhubEarningsProvider("token")
     events = provider.fetch(["AAPL", "GOOGL"], date(2024, 1, 1), date(2024, 1, 31))
 
     assert events == [
-        EarningsEvent("AAPL", date(2024, 1, 25), "BMO", "Finnhub"),
+        EarningsEvent(symbol="AAPL", date=date(2024, 1, 25), session="BMO", source="Finnhub"),
     ]
 
 
 def test_deduplicate_events_preserves_first_occurrence():
-    first = EarningsEvent("AAPL", date(2024, 1, 10), "BMO", "FMP")
-    duplicate = EarningsEvent("AAPL", date(2024, 1, 10), "AMC", "Finnhub")
-    other = EarningsEvent("MSFT", date(2024, 1, 12), "", "FMP")
+    first = EarningsEvent(symbol="AAPL", date=date(2024, 1, 10), session="BMO", source="FMP")
+    duplicate = EarningsEvent(symbol="AAPL", date=date(2024, 1, 10), session="AMC", source="Finnhub")
+    other = EarningsEvent(symbol="MSFT", date=date(2024, 1, 12), source="FMP")
 
     deduped = deduplicate_events([first, duplicate, other])
 
@@ -175,7 +183,7 @@ def test_deduplicate_events_preserves_first_occurrence():
 
 
 def test_build_ics_generates_expected_fields():
-    event = EarningsEvent("AAPL", date(2024, 1, 25), "AMC", "FMP", url="https://example.com")
+    event = EarningsEvent(symbol="AAPL", date=date(2024, 1, 25), session="AMC", source="FMP", url="https://example.com")
     ics = build_ics([event], prodid="-//test//")
 
     assert "PRODID:-//test//" in ics
@@ -468,7 +476,7 @@ def test_google_insert_creates_calendar_when_missing(monkeypatch):
     service = StubGoogleService()
     monkeypatch.setattr(calendars_mod, "_get_google_service", lambda *args, **kwargs: service)
 
-    event = EarningsEvent("AAPL", date(2024, 5, 1), "AMC", "FMP")
+    event = EarningsEvent(symbol="AAPL", date=date(2024, 5, 1), session="AMC", source="FMP")
 
     calendar_id = calendars_mod.google_insert(
         [event],
@@ -489,7 +497,7 @@ def test_google_insert_upserts_existing(monkeypatch):
     service = StubGoogleService({"primary": "Primary"})
     monkeypatch.setattr(calendars_mod, "_get_google_service", lambda *args, **kwargs: service)
 
-    base_event = EarningsEvent("MSFT", date(2024, 6, 10), "BMO", "FMP")
+    base_event = EarningsEvent(symbol="MSFT", date=date(2024, 6, 10), session="BMO", source="FMP")
 
     calendars_mod.google_insert(
         [base_event],
@@ -502,7 +510,7 @@ def test_google_insert_upserts_existing(monkeypatch):
     first_event = service.events_data["primary"][0]
     event_id = first_event["id"]
 
-    updated_event = EarningsEvent("MSFT", date(2024, 6, 10), "BMO", "FMP", notes="Updated desc")
+    updated_event = EarningsEvent(symbol="MSFT", date=date(2024, 6, 10), session="BMO", source="FMP", notes="Updated desc")
 
     calendars_mod.google_insert(
         [updated_event],

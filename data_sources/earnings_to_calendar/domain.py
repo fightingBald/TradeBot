@@ -2,21 +2,36 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 from datetime import date
 from typing import List, Sequence, Tuple
 
+from pydantic import BaseModel, Field, field_validator
 
-@dataclass(frozen=True)
-class EarningsEvent:
+
+class EarningsEvent(BaseModel):
     """Normalized representation of a single earnings calendar event."""
 
-    symbol: str
+    symbol: str = Field(..., description="Ticker symbol")
     date: date
-    session: str = ""
-    source: str = ""
+    session: str = Field("", description="BMO/AMC/UNSPECIFIED")
+    source: str = Field("", description="Data provider name")
     url: str | None = None
     notes: str | None = None
+
+    @field_validator("symbol", mode="before")
+    @classmethod
+    def _normalize_symbol(cls, value: str) -> str:
+        return (value or "").strip().upper()
+
+    @field_validator("session", mode="before")
+    @classmethod
+    def _normalize_session(cls, value: str) -> str:
+        return (value or "").strip().upper()
+
+    @field_validator("source", mode="before")
+    @classmethod
+    def _normalize_source(cls, value: str) -> str:
+        return (value or "").strip()
 
     @property
     def iso_date(self) -> str:
@@ -35,7 +50,7 @@ class EarningsEvent:
 
 
 def parse_iso_date(raw: str | None) -> date | None:
-    """Parse the first 10 characters of the provided string into a date."""
+    """Parse a string into date if possible."""
     if not raw:
         return None
     text = raw.strip()
@@ -44,7 +59,7 @@ def parse_iso_date(raw: str | None) -> date | None:
     candidate = text[:10]
     try:
         return date.fromisoformat(candidate)
-    except ValueError:
+    except ValueError:  # pragma: no cover - guarded parser
         return None
 
 
@@ -59,3 +74,6 @@ def deduplicate_events(events: Sequence[EarningsEvent]) -> List[EarningsEvent]:
         seen.add(key)
         unique.append(event)
     return unique
+
+
+__all__ = ["EarningsEvent", "parse_iso_date", "deduplicate_events"]
