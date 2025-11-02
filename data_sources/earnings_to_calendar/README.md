@@ -45,6 +45,8 @@ python -m data_sources.earnings_to_calendar \
 - `--google-calendar-id` / `--google-calendar-name`：指定目标日历；未提供时默认使用 `primary`，若只给 name 可配合 `--google-create-calendar` 自动创建。
 - `--market-events`：追加四巫日 / OPEX / VIX 等市场事件。
 - `--macro-events`：追加宏观经济事件（FOMC / CPI / NFP 等），可配合 `--macro-event-keywords` 精准筛选。
+- `--incremental`：开启 Google Calendar 增量同步（仅对 Google 写入生效）。
+- `--sync-state-path`：指定增量同步状态文件路径（默认为 `.cache/earnings_sync.json`）。
 - `--icloud-insert`：同步到 iCloud，需提供 `--icloud-id` 与 `--icloud-app-pass`。
 
 ## 配置文件（可选）
@@ -56,6 +58,7 @@ python -m data_sources.earnings_to_calendar \
 - `market_events`：是否同时加入四巫日/OPEX/VIX 结算等市场事件；
 - `macro_events`：是否追加宏观事件（FOMC / ECB / BOE / BOJ 决议、CPI / PPI、NFP、零售销售、ISM、财政部拍卖等）；
 - `macro_event_keywords`：宏观事件关键词白名单，默认覆盖常见项目，可按需增删；
+- `incremental_sync` / `sync_state_path`：开启并配置增量同步状态文件，避免重复向 Google Calendar 写入未变化事件；
 TOML 支持 `#` 注释，可按需启用/关闭字段，也可以通过 `--config=...` 指向其他 TOML/JSON 文件。
 
 运行时只需覆盖想临时调整的字段（TOML 支持 `#` 注释，方便禁用配置）：
@@ -123,6 +126,8 @@ python -m data_sources.earnings_to_calendar --config=config/earnings_to_calendar
 - `settings.py`：解析 `.env`、配置文件与 CLI 参数，产出 `RuntimeOptions`。
 - `runner.py`：主业务编排（拉取数据、写 ICS/Google/iCloud），并输出运行概要。
 - `calendars.py`：ICS 构建与 Google/iCloud 写入逻辑。
+- `macro_events.py`：抓取并归一化宏观经济事件（FOMC / CPI / NFP 等）。
+- `sync_state.py`：管理增量同步状态文件与差异计算。
 - `cli.py`：命令行入口，负责解析参数与调用 `runner.run()`。
 - `__init__.py`：对外统一导出。
 

@@ -17,6 +17,7 @@ from .market_events import generate_market_events
 from .macro_events import fetch_macro_events
 from .providers import PROVIDERS, EarningsDataProvider
 from .settings import RuntimeOptions
+from .sync_state import build_sync_state, diff_events, load_sync_state, save_sync_state, SyncDiff
 
 logger = get_logger()
 
@@ -29,6 +30,7 @@ class RunSummary:
     google_calendar_id: str | None = None
     ics_path: str | None = None
     icloud_calendar_name: str | None = None
+    sync_stats: dict[str, int] | None = None
 
 
 def _resolve_provider(options: RuntimeOptions) -> EarningsDataProvider:
@@ -70,7 +72,11 @@ def collect_events(
             logger.info("追加市场事件 %d 条", len(extras))
             events.extend(extras)
     if options.macro_events:
-        macro_events = fetch_macro_events(since, until, options)
+        try:
+            macro_events = fetch_macro_events(since, until, options)
+        except Exception as exc:  # pragma: no cover - network failure surfaces to logs
+            logger.error("获取宏观事件失败，将继续处理基础财报事件：%s", exc)
+            macro_events = []
         if macro_events:
             logger.info("追加宏观事件 %d 条", len(macro_events))
             events.extend(macro_events)
@@ -110,6 +116,8 @@ def apply_outputs(
     *,
     since: date,
     until: date,
+    events_for_google: Sequence[EarningsEvent],
+    sync_diff: SyncDiff | None = None,
 ) -> RunSummary:
     summary = RunSummary(
         since=since,
@@ -142,23 +150,54 @@ def apply_outputs(
             options.google_credentials,
             options.google_token,
         )
-        if events:
-            formatted = _format_google_event_lines(events, options)
-            logger.info("Google Calendar 待写入事件（%d 条）：\n%s", len(events), formatted)
+        if sync_diff is not None:
+            created = len(sync_diff.to_create)
+            updated = len(sync_diff.to_update)
+            skipped = len(sync_diff.unchanged)
+            summary.sync_stats = {
+                "created": created,
+                "updated": updated,
+                "skipped": skipped,
+                "total": len(events),
+            }
+            logger.info(
+                "增量同步统计：create=%d update=%d skip=%d total=%d",
+                created,
+                updated,
+                skipped,
+                len(events),
+            )
+        if events_for_google:
+            formatted = _format_google_event_lines(events_for_google, options)
+            logger.info("Google Calendar 待写入事件（%d 条）：\n%s", len(events_for_google), formatted)
+            target_calendar_id = google_insert(
+                events_for_google,
+                calendar_id=options.google_calendar_id,
+                creds_path=options.google_credentials,
+                token_path=options.google_token,
+                calendar_name=options.google_calendar_name,
+                create_if_missing=options.google_create_calendar,
+                target_timezone=options.target_timezone,
+                default_duration_minutes=options.event_duration_minutes,
+            )
+            print(f"已写入 Google Calendar: {target_calendar_id}")
+            summary.google_calendar_id = target_calendar_id
         else:
-            logger.info("Google Calendar 待写入事件：0 条")
-        target_calendar_id = google_insert(
-            events,
-            calendar_id=options.google_calendar_id,
-            creds_path=options.google_credentials,
-            token_path=options.google_token,
-            calendar_name=options.google_calendar_name,
-            create_if_missing=options.google_create_calendar,
-            target_timezone=options.target_timezone,
-            default_duration_minutes=options.event_duration_minutes,
-        )
-        print(f"已写入 Google Calendar: {target_calendar_id}")
-        summary.google_calendar_id = target_calendar_id
+            logger.info("增量同步无需写入 Google Calendar（无变动）")
+            if summary.sync_stats is None:
+                summary.sync_stats = {
+                    "created": 0,
+                    "updated": 0,
+                    "skipped": len(events),
+                    "total": len(events),
+                }
+    elif sync_diff is not None:
+        summary.sync_stats = {
+            "created": len(sync_diff.to_create),
+            "updated": len(sync_diff.to_update),
+            "skipped": len(sync_diff.unchanged),
+            "total": len(events),
+        }
 
     if options.icloud_insert:
         if not (options.icloud_id and options.icloud_app_pass):
@@ -175,7 +214,32 @@ def run(options: RuntimeOptions, *, today: date | None = None) -> RunSummary:
     start_date = today or date.today()
     end_date = start_date + timedelta(days=options.days)
     events = collect_events(options, since=start_date, until=end_date)
-    return apply_outputs(events, options, since=start_date, until=end_date)
+    sync_diff: SyncDiff | None = None
+    events_for_google: Sequence[EarningsEvent] = events
+    if options.incremental_sync and options.sync_state_path:
+        state = load_sync_state(options.sync_state_path)
+        sync_diff = diff_events(events, state)
+        events_for_google = [*sync_diff.to_create, *sync_diff.to_update]
+    summary = apply_outputs(
+        events,
+        options,
+        since=start_date,
+        until=end_date,
+        events_for_google=events_for_google,
+        sync_diff=sync_diff,
+    )
+    if options.incremental_sync and options.sync_state_path:
+        fingerprints = sync_diff.fingerprints if sync_diff else {}
+        new_state = build_sync_state(events, fingerprints, since=start_date, until=end_date)
+        save_sync_state(options.sync_state_path, new_state)
+        if summary.sync_stats is None and sync_diff is not None:
+            summary.sync_stats = {
+                "created": len(sync_diff.to_create),
+                "updated": len(sync_diff.to_update),
+                "skipped": len(sync_diff.unchanged),
+                "total": len(events),
+            }
+    return summary
 
 
 __all__ = ["RunSummary", "apply_outputs", "collect_events", "run"]

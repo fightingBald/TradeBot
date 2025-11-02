@@ -84,6 +84,10 @@ def _clear_env(monkeypatch):
         "ICLOUD_INSERT",
         "ICLOUD_APPLE_ID",
         "ICLOUD_APP_PASSWORD",
+        "MACRO_EVENTS",
+        "MACRO_EVENT_KEYWORDS",
+        "INCREMENTAL_SYNC",
+        "SYNC_STATE_PATH",
     ]:
         monkeypatch.delenv(key, raising=False)
 
@@ -134,6 +138,8 @@ def test_build_runtime_options_merges_config(tmp_path, monkeypatch):
         icloud_app_pass=None,
         macro_events=False,
         macro_event_keywords=None,
+        incremental=False,
+        sync_state_path=None,
     )
 
     project_root = Path(tmp_path)
@@ -166,6 +172,8 @@ def test_build_runtime_options_merges_config(tmp_path, monkeypatch):
     assert options.market_events is True
     assert options.macro_events is True
     assert options.macro_event_keywords == ["FOMC", "CPI"]
+    assert options.incremental_sync is False
+    assert options.sync_state_path is None
 
 
 def test_build_runtime_options_cli_overrides_config(tmp_path, monkeypatch):
@@ -199,6 +207,8 @@ def test_build_runtime_options_cli_overrides_config(tmp_path, monkeypatch):
         icloud_app_pass=None,
         macro_events=True,
         macro_event_keywords="Treasury",
+        incremental=True,
+        sync_state_path="state.json",
     )
 
     project_root = Path(tmp_path)
@@ -225,6 +235,8 @@ def test_build_runtime_options_cli_overrides_config(tmp_path, monkeypatch):
     assert options.market_events is True
     assert options.macro_events is True
     assert options.macro_event_keywords == ["Treasury"]
+    assert options.incremental_sync is True
+    assert options.sync_state_path.endswith("state.json")
 
 
 def test_build_runtime_options_uses_env_defaults(tmp_path, monkeypatch):
@@ -242,6 +254,8 @@ def test_build_runtime_options_uses_env_defaults(tmp_path, monkeypatch):
     monkeypatch.setenv("EVENT_DURATION_MINUTES", "75")
     monkeypatch.setenv("SESSION_TIMES", "BMO=07:45,AMC=19:00")
     monkeypatch.setenv("MACRO_EVENT_KEYWORDS", "FOMC,NFP")
+    monkeypatch.setenv("INCREMENTAL_SYNC", "true")
+    monkeypatch.setenv("SYNC_STATE_PATH", "state/cache.json")
     monkeypatch.setenv("ICLOUD_INSERT", "1")
     monkeypatch.setenv("ICLOUD_APPLE_ID", "user@icloud.com")
     monkeypatch.setenv("ICLOUD_APP_PASSWORD", "pass-1234")
@@ -267,6 +281,8 @@ def test_build_runtime_options_uses_env_defaults(tmp_path, monkeypatch):
         icloud_app_pass=None,
         macro_events=False,
         macro_event_keywords=None,
+        incremental=False,
+        sync_state_path=None,
     )
 
     config_base = Path(tmp_path) / "config_dir"
@@ -297,6 +313,8 @@ def test_build_runtime_options_uses_env_defaults(tmp_path, monkeypatch):
     assert options.icloud_app_pass == "pass-1234"
     assert options.macro_events is True
     assert options.macro_event_keywords == ["FOMC", "NFP"]
+    assert options.incremental_sync is True
+    assert options.sync_state_path.endswith("state/cache.json")
 
 
 def test_build_runtime_options_resolves_paths_relative_to_config(tmp_path, monkeypatch):
@@ -334,6 +352,8 @@ def test_build_runtime_options_resolves_paths_relative_to_config(tmp_path, monke
         icloud_app_pass=None,
         macro_events=False,
         macro_event_keywords=None,
+        incremental=False,
+        sync_state_path=None,
     )
 
     options = build_runtime_options(
@@ -352,3 +372,5 @@ def test_build_runtime_options_resolves_paths_relative_to_config(tmp_path, monke
     assert options.session_time_map == DEFAULT_SESSION_TIMES
     assert options.market_events is False
     assert options.macro_events is False
+    assert options.incremental_sync is False
+    assert options.sync_state_path is None

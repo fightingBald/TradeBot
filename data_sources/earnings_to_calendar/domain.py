@@ -79,4 +79,10 @@ def deduplicate_events(events: Sequence[EarningsEvent]) -> List[EarningsEvent]:
     return unique
 
 
-__all__ = ["EarningsEvent", "parse_iso_date", "deduplicate_events"]
+def earnings_key(event: EarningsEvent) -> str:
+    """Stable identifier used for calendar sync."""
+    session = (event.session or "").upper() or "UNSPECIFIED"
+    return f"{event.symbol.upper()}::{event.iso_date}::{session}"
+
+
+__all__ = ["EarningsEvent", "parse_iso_date", "deduplicate_events", "earnings_key"]

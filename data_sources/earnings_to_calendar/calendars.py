@@ -9,7 +9,7 @@ from typing import Dict, Optional, Sequence
 from zoneinfo import ZoneInfo
 
 from .defaults import DEFAULT_EVENT_DURATION_MINUTES, DEFAULT_TARGET_TIMEZONE
-from .domain import EarningsEvent
+from .domain import EarningsEvent, earnings_key
 from .logging_utils import get_logger
 
 logger = get_logger()
@@ -159,8 +159,7 @@ def _ensure_calendar(
 
 
 def _earnings_key(event: EarningsEvent) -> str:
-    session = (event.session or "").upper() or "UNSPECIFIED"
-    return f"{event.symbol.upper()}::{event.iso_date}::{session}"
+    return earnings_key(event)
 
 
 def _build_google_event_body(

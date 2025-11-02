@@ -39,6 +39,8 @@ def _build_parser() -> argparse.ArgumentParser:
         "--macro-event-keywords",
         help="Comma separated macro event keywords to filter, e.g. FOMC,CPI,NFP",
     )
+    parser.add_argument("--incremental", action="store_true", help="Enable incremental Google Calendar sync")
+    parser.add_argument("--sync-state-path", help="Path to incremental sync state JSON cache")
     parser.add_argument("--icloud-insert", action="store_true", help="Insert to iCloud via CalDAV")
     parser.add_argument("--icloud-id")
     parser.add_argument("--icloud-app-pass")
