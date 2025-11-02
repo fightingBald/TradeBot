@@ -26,6 +26,10 @@ def test_generate_market_events():
         icloud_insert=False,
         icloud_id=None,
         icloud_app_pass=None,
+        macro_events=False,
+        macro_event_keywords=[],
+        incremental_sync=False,
+        sync_state_path=None,
     )
 
     events = generate_market_events(date(2024, 3, 1), date(2024, 3, 31), options)

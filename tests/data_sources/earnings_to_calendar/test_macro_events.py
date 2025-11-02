@@ -39,6 +39,8 @@ def _base_options(**overrides):
         icloud_app_pass=None,
         macro_events=True,
         macro_event_keywords=[],
+        incremental_sync=False,
+        sync_state_path=None,
     )
     params.update(overrides)
     return RuntimeOptions(**params)

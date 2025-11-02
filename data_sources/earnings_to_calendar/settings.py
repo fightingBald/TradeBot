@@ -26,6 +26,7 @@ _DEFAULT_SOURCE = "fmp"
 _DEFAULT_GOOGLE_CREDENTIALS = "credentials.json"
 _DEFAULT_GOOGLE_TOKEN = "token.json"
 _DEFAULT_ENV_FILE = ".env"
+_DEFAULT_SYNC_STATE = ".cache/earnings_sync.json"
 
 CONFIG_TEMPLATE = """# Earnings → Calendar CLI defaults (TOML)
 
@@ -52,6 +53,10 @@ market_events = false
 macro_events = false
 macro_event_keywords = ["FOMC", "ECB", "BOE", "BOJ", "CPI", "PPI", "NFP", "Retail Sales", "ISM", "Treasury"]
 
+# 增量同步（仅对 Google Calendar 生效）
+incremental_sync = false
+sync_state_path = ".cache/earnings_sync.json"
+
 # 会话时间映射，可根据需要覆盖（BMO=盘前, AMC=盘后）
 [session_times]
 BMO = "08:00"
@@ -74,6 +79,8 @@ _ENV_KEY_ICLOUD_ID = "ICLOUD_APPLE_ID"
 _ENV_KEY_ICLOUD_APP_PASS = "ICLOUD_APP_PASSWORD"
 _ENV_KEY_MACRO_EVENTS = "MACRO_EVENTS"
 _ENV_KEY_MACRO_KEYWORDS = "MACRO_EVENT_KEYWORDS"
+_ENV_KEY_INCREMENTAL_SYNC = "INCREMENTAL_SYNC"
+_ENV_KEY_SYNC_STATE_PATH = "SYNC_STATE_PATH"
 
 
 @dataclass
@@ -98,6 +105,8 @@ class RuntimeOptions:
     icloud_app_pass: str | None
     macro_events: bool = False
     macro_event_keywords: List[str] = field(default_factory=list)
+    incremental_sync: bool = False
+    sync_state_path: str | None = None
 
 
 def parse_symbols(raw: Iterable[str]) -> List[str]:
@@ -443,6 +452,28 @@ def build_runtime_options(
     )
     macro_event_keywords = _coerce_str_list(raw_macro_keywords)
 
+    incremental_sync = bool(getattr(parsed, "incremental", False))
+    if not incremental_sync:
+        config_incremental = _coerce_bool(config.get("incremental_sync")) if "incremental_sync" in config else None
+        if config_incremental is not None:
+            incremental_sync = config_incremental
+        else:
+            env_incremental = _coerce_bool(os.getenv(_ENV_KEY_INCREMENTAL_SYNC))
+            incremental_sync = env_incremental if env_incremental is not None else False
+
+    raw_sync_state_path = (
+        getattr(parsed, "sync_state_path", None)
+        or config.get("sync_state_path")
+        or os.getenv(_ENV_KEY_SYNC_STATE_PATH)
+    )
+    if not raw_sync_state_path and incremental_sync:
+        raw_sync_state_path = _DEFAULT_SYNC_STATE
+    sync_state_path = (
+        _resolve_path(raw_sync_state_path, base=config_base, root=project_root)
+        if raw_sync_state_path
+        else None
+    )
+
     options = RuntimeOptions(
         symbols=symbols,
         source=source,
@@ -464,6 +495,8 @@ def build_runtime_options(
         icloud_app_pass=str(icloud_app_pass) if icloud_app_pass is not None else None,
         macro_events=macro_events,
         macro_event_keywords=macro_event_keywords,
+        incremental_sync=incremental_sync,
+        sync_state_path=str(sync_state_path) if sync_state_path is not None else None,
     )
 
     return options
