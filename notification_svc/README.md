@@ -133,7 +133,7 @@ bcc = [
 
 3. **更新 `.env` 或环境变量**  
    ```dotenv
-   EMAIL_USERNAME=tanghuayi906@gmail.com
+   EMAIL_USERNAME=example@gmail.com
    EMAIL_PASSWORD=这里填刚刚生成的16位应用专用密码
    ```
 
