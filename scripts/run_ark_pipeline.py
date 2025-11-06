@@ -11,6 +11,7 @@ from __future__ import annotations
 import os
 import sys
 from pathlib import Path
+import shutil
 
 
 def _get_env(name: str, default: str | None = None) -> str:
@@ -55,16 +56,15 @@ def run() -> None:
     from py_scripts.ark_holdings.daily_pipeline import main as pipeline_main  # noqa: WPS433
 
     baseline_artifact = _get_env("BASELINE_ARTIFACT_NAME", "ark-holdings-baseline")
-    baseline_dir = _get_env("BASELINE_DIR", "baseline")
+    baseline_dir_name = _get_env("BASELINE_DIR", "baseline")
     output_dir = _get_env("OUTPUT_DIR", "temp/ark_pipeline/latest_snapshots")
-    retention_days = _get_env("RETENTION_DAYS", "30")
     fund_list = _normalise_fund_list(_get_env("FUND_LIST", ""))
     min_weight_bp = _get_env("MIN_WEIGHT_BP", "1")
     min_share_delta = _get_env("MIN_SHARE_DELTA", "1")
     holdings_limit = _parse_int(_get_env("HOLDINGS_LIMIT", "25"), default=25)
     send_email = _parse_bool(_get_env("EMAIL_ENABLED", "true"), default=True)
 
-    baseline_path = Path("baseline") / baseline_artifact / baseline_dir
+    baseline_path = _resolve_baseline_path(baseline_dir_name, baseline_artifact)
     summary_path = Path("temp/ark_pipeline/diff_summary.md")
     summary_json_path = Path("temp/ark_pipeline/diff_summary.json")
 
@@ -96,6 +96,23 @@ def run() -> None:
 
     sys.argv = args
     pipeline_main()
+
+    # 清理旧的基线目录，避免在下一次运行时混淆
+    baseline_root = Path("baseline")
+    if baseline_root.exists():
+        shutil.rmtree(baseline_root, ignore_errors=True)
+
+
+def _resolve_baseline_path(baseline_dir_name: str, baseline_artifact: str) -> Path:
+    baseline_root = Path("baseline")
+    primary = baseline_root / baseline_dir_name
+    fallback = baseline_root / baseline_artifact / baseline_dir_name
+    if primary.exists():
+        return primary
+    if fallback.exists():
+        return fallback
+    # 如果都不存在，返回 primary 路径（管道内部会处理“首次运行”场景）
+    return primary
 
 
 if __name__ == "__main__":  # pragma: no cover - invoked by workflow
