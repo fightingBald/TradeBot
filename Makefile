@@ -1,12 +1,15 @@
-.PHONY: install test format lint clean fetch-ark diff-ark
+.PHONY: install build test format lint clean fetch-ark diff-ark
 
-PYTHON := python
+PYTHON ?= python
 VENV ?= .venv
 ACTIVATE := . $(VENV)/bin/activate
 
 install:
 	$(PYTHON) -m pip install --upgrade pip
 	$(PYTHON) -m pip install -r requirements.txt
+
+build:
+	$(PYTHON) -m compileall app data_sources notification_svc py_scripts
 
 test:
 	$(ACTIVATE) && pytest

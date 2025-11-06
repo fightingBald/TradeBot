@@ -11,6 +11,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from data_sources.ark_holdings import FUND_CSV, fetch_holdings_snapshot
+from data_sources.ark_holdings.io import snapshot_to_dataframe
 
 
 def main() -> None:
@@ -44,26 +45,6 @@ def main() -> None:
         df = snapshot_to_dataframe(snapshot)
         df.to_csv(filename, index=False)
         print(f"[ok] {filename}")
-
-
-def snapshot_to_dataframe(snapshot):
-    import pandas as pd
-
-    rows = [
-        {
-            "as_of": holding.as_of.isoformat(),
-            "etf": holding.etf,
-            "company": holding.company,
-            "ticker": holding.ticker,
-            "cusip": holding.cusip,
-            "shares": holding.shares,
-            "market_value": holding.market_value,
-            "weight": holding.weight,
-            "price": holding.price,
-        }
-        for holding in snapshot.holdings
-    ]
-    return pd.DataFrame(rows)
 
 
 if __name__ == "__main__":

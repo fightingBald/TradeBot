@@ -3,11 +3,9 @@
 from __future__ import annotations
 
 import argparse
-from pathlib import Path
 
-import pandas as pd
-
-from data_sources.ark_holdings import Holding, HoldingSnapshot, diff_snapshots, summarize_changes
+from data_sources.ark_holdings import diff_snapshots, summarize_changes
+from data_sources.ark_holdings.io import load_snapshot_csv
 
 
 def main() -> None:
@@ -17,8 +15,8 @@ def main() -> None:
     parser.add_argument("--top", type=int, default=10, help="Top N changes to display")
     args = parser.parse_args()
 
-    prev_snapshot = load_snapshot(args.previous)
-    curr_snapshot = load_snapshot(args.current)
+    prev_snapshot = load_snapshot_csv(args.previous)
+    curr_snapshot = load_snapshot_csv(args.current)
 
     changes = diff_snapshots(prev_snapshot, curr_snapshot)
     summary = summarize_changes(changes, top_n=args.top)
@@ -32,29 +30,8 @@ def main() -> None:
     print_changes("减持 Top", summary["sells"])
 
 
-def load_snapshot(path: str | Path) -> HoldingSnapshot:
-    df = pd.read_csv(path)
-    as_of = pd.to_datetime(df["as_of"]).dt.date.iloc[0]
-    etf = str(df["etf"].iloc[0])
-    holdings = [
-        Holding(
-            as_of=as_of,
-            etf=etf,
-            company=row["company"],
-            ticker=row["ticker"],
-            cusip=row.get("cusip"),
-            shares=row.get("shares"),
-            market_value=row.get("market_value"),
-            weight=row.get("weight"),
-            price=row.get("price"),
-        )
-        for _, row in df.iterrows()
-    ]
-    return HoldingSnapshot(etf=etf, as_of=as_of, holdings=holdings)
-
-
 def print_changes(title: str, changes):
-    print(f"{title}:" )
+    print(f"{title}:")
     if not changes:
         print("  无")
         return
