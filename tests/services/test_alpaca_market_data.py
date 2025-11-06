@@ -61,7 +61,9 @@ def test_get_user_positions_converts_sdk_models(monkeypatch) -> None:
         def model_dump(self) -> Dict[str, Any]:
             return self._payload
 
-    monkeypatch.setattr("app.services.alpaca_market_data.TradingClient", fake_trading_client)
+    monkeypatch.setattr(
+        "app.services.alpaca_market_data.TradingClient", fake_trading_client
+    )
     monkeypatch.setenv("ALPACA_API_KEY", "key")
     monkeypatch.setenv("ALPACA_API_SECRET", "secret")
     monkeypatch.setenv("ALPACA_TRADING_BASE_URL", "https://paper-api.alpaca.markets")
@@ -95,7 +97,9 @@ def test_get_user_positions_wraps_api_errors(monkeypatch) -> None:
         def get_all_positions(self) -> List[Any]:
             raise DummyAPIError("boom")
 
-    monkeypatch.setattr("app.services.alpaca_market_data.TradingClient", DummyTradingClient)
+    monkeypatch.setattr(
+        "app.services.alpaca_market_data.TradingClient", DummyTradingClient
+    )
     monkeypatch.setattr("app.services.alpaca_market_data.APIError", DummyAPIError)
     monkeypatch.setenv("ALPACA_API_KEY", "key")
     monkeypatch.setenv("ALPACA_API_SECRET", "secret")

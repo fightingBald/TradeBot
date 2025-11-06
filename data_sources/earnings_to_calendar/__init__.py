@@ -12,7 +12,13 @@ from .providers import (
 )
 from .macro_events import fetch_macro_events
 from .runner import RunSummary, apply_outputs, collect_events, run
-from .settings import RuntimeOptions, build_runtime_options, load_config, load_env_file, parse_symbols
+from .settings import (
+    RuntimeOptions,
+    build_runtime_options,
+    load_config,
+    load_env_file,
+    parse_symbols,
+)
 
 _parse_symbols = parse_symbols  # backward compatibility
 

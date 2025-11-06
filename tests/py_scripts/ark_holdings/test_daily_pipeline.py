@@ -63,7 +63,9 @@ def current_snapshot() -> HoldingSnapshot:
 
 
 def test_change_to_dict_contains_abs_fields(baseline_snapshot, current_snapshot):
-    changes = diff_snapshots(baseline_snapshot, current_snapshot, weight_threshold=0.0, share_threshold=0.0)
+    changes = diff_snapshots(
+        baseline_snapshot, current_snapshot, weight_threshold=0.0, share_threshold=0.0
+    )
     assert changes, "expected at least one change"
     payload = change_to_dict(changes[0])
     assert "weight_change_abs" in payload
@@ -73,9 +75,15 @@ def test_change_to_dict_contains_abs_fields(baseline_snapshot, current_snapshot)
 
 
 def test_render_email_html_orders_sections(baseline_snapshot, current_snapshot):
-    changes = diff_snapshots(baseline_snapshot, current_snapshot, weight_threshold=0.0, share_threshold=0.0)
-    report = _build_etf_report("ARKK", baseline_snapshot, current_snapshot, changes, top_n=5)
-    html_body = _render_email_html([report], {"ARKK": current_snapshot}, holdings_limit=10)
+    changes = diff_snapshots(
+        baseline_snapshot, current_snapshot, weight_threshold=0.0, share_threshold=0.0
+    )
+    report = _build_etf_report(
+        "ARKK", baseline_snapshot, current_snapshot, changes, top_n=5
+    )
+    html_body = _render_email_html(
+        [report], {"ARKK": current_snapshot}, holdings_limit=10
+    )
 
     # Expect key elements present
     assert "<h2>ARKK</h2>" in html_body

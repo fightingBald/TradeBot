@@ -30,18 +30,32 @@ class EmailSettings(BaseSettings):
 
     """
 
-    model_config = SettingsConfigDict(env_prefix="EMAIL_", env_file=".env", extra="ignore")
+    model_config = SettingsConfigDict(
+        env_prefix="EMAIL_", env_file=".env", extra="ignore"
+    )
 
     host: str = Field(..., description="SMTP host name or IP.")
     port: int = Field(default=587, ge=1, le=65535, description="SMTP port.")
     username: str | None = Field(default=None, description="SMTP username (optional).")
-    password: SecretStr | None = Field(default=None, description="SMTP password (optional).")
+    password: SecretStr | None = Field(
+        default=None, description="SMTP password (optional)."
+    )
     sender: EmailStr = Field(..., description="Default From address.")
-    reply_to: EmailStr | None = Field(default=None, description="Optional Reply-To address.")
-    use_tls: bool = Field(default=True, description="Upgrade connection to TLS via STARTTLS.")
-    use_ssl: bool = Field(default=False, description="Use implicit SSL (mutually exclusive with use_tls).")
-    timeout: float = Field(default=20.0, gt=0, description="SMTP socket timeout (seconds).")
-    max_retries: int = Field(default=1, ge=1, le=5, description="Number of retries on transient errors.")
+    reply_to: EmailStr | None = Field(
+        default=None, description="Optional Reply-To address."
+    )
+    use_tls: bool = Field(
+        default=True, description="Upgrade connection to TLS via STARTTLS."
+    )
+    use_ssl: bool = Field(
+        default=False, description="Use implicit SSL (mutually exclusive with use_tls)."
+    )
+    timeout: float = Field(
+        default=20.0, gt=0, description="SMTP socket timeout (seconds)."
+    )
+    max_retries: int = Field(
+        default=1, ge=1, le=5, description="Number of retries on transient errors."
+    )
 
     def require_credentials(self) -> tuple[str, str] | None:
         if self.username and self.password:
@@ -152,7 +166,11 @@ class EmailNotificationService:
             attempt += 1
             try:
                 self._send_via_smtp(message, recipients)
-                logger.info("邮件发送成功：message_id=%s recipients=%s", message["Message-ID"], recipients)
+                logger.info(
+                    "邮件发送成功：message_id=%s recipients=%s",
+                    message["Message-ID"],
+                    recipients,
+                )
                 return
             except (smtplib.SMTPException, OSError) as exc:
                 last_error = exc

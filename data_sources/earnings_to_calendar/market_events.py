@@ -31,7 +31,9 @@ def _month_range(start: date, end: date) -> Iterable[tuple[int, int]]:
             month += 1
 
 
-def generate_market_events(start: date, end: date, options: RuntimeOptions) -> List[EarningsEvent]:
+def generate_market_events(
+    start: date, end: date, options: RuntimeOptions
+) -> List[EarningsEvent]:
     """生成四巫日 / OPEX / VIX 结算等市场事件。"""
     tz = ZoneInfo(options.source_timezone)
     duration = timedelta(minutes=options.event_duration_minutes)

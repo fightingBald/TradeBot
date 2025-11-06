@@ -128,11 +128,21 @@ def test_run_incremental_skips_when_state_matches(tmp_path, monkeypatch):
 
     first_summary = run(options, today=date(2024, 3, 1))
     assert google_batches and len(google_batches[0]) == 1
-    assert first_summary.sync_stats == {"created": 1, "updated": 0, "skipped": 0, "total": 1}
+    assert first_summary.sync_stats == {
+        "created": 1,
+        "updated": 0,
+        "skipped": 0,
+        "total": 1,
+    }
 
     google_batches.clear()
 
     second_summary = run(options, today=date(2024, 3, 1))
     assert not google_batches  # 没有再次调用写入
-    assert second_summary.sync_stats == {"created": 0, "updated": 0, "skipped": 1, "total": 1}
+    assert second_summary.sync_stats == {
+        "created": 0,
+        "updated": 0,
+        "skipped": 1,
+        "total": 1,
+    }
     assert sync_path.exists()

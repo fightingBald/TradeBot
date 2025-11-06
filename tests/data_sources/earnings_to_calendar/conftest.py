@@ -76,7 +76,9 @@ class StubGoogleService:
         outer = self
 
         class Events:
-            def list(self, calendarId, privateExtendedProperty, **kwargs):  # noqa: ANN001,N803
+            def list(
+                self, calendarId, privateExtendedProperty, **kwargs
+            ):  # noqa: ANN001,N803
                 key = privateExtendedProperty.split("=", 1)[1]
                 matches = [
                     evt

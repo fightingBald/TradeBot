@@ -10,7 +10,9 @@ from data_sources.ark_holdings.io import load_snapshot_csv
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Diff ARK ETF holdings snapshots")
-    parser.add_argument("--previous", required=True, help="Path to previous snapshot CSV")
+    parser.add_argument(
+        "--previous", required=True, help="Path to previous snapshot CSV"
+    )
     parser.add_argument("--current", required=True, help="Path to current snapshot CSV")
     parser.add_argument("--top", type=int, default=10, help="Top N changes to display")
     args = parser.parse_args()

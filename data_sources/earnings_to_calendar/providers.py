@@ -49,7 +49,9 @@ class EarningsDataProvider:
 
     def _get(self, url: str) -> httpx.Response:
         logger.debug("HTTP GET %s", url)
-        response = httpx.get(url, headers={"User-Agent": USER_AGENT}, timeout=DEFAULT_TIMEOUT_SECONDS)
+        response = httpx.get(
+            url, headers={"User-Agent": USER_AGENT}, timeout=DEFAULT_TIMEOUT_SECONDS
+        )
         response.raise_for_status()
         return response
 
@@ -70,7 +72,9 @@ class EarningsDataProvider:
                 continue
         return None
 
-    def _build_datetime(self, event_date: date, session: str, raw_time: str | None) -> tuple[datetime | None, datetime | None]:
+    def _build_datetime(
+        self, event_date: date, session: str, raw_time: str | None
+    ) -> tuple[datetime | None, datetime | None]:
         time_obj = self._parse_time_string(raw_time)
         if time_obj is None:
             mapped = self._session_times.get(session.upper())
@@ -142,8 +146,12 @@ class FmpEarningsProvider(EarningsDataProvider):
         df["source"] = self.source_name
 
         events: List[EarningsEvent] = []
-        for row in df[["symbol", "date", "session", "source", "time"]].itertuples(index=False, name="Row"):
-            start_at, end_at = self._build_datetime(row.date, row.session, getattr(row, "time", None))
+        for row in df[["symbol", "date", "session", "source", "time"]].itertuples(
+            index=False, name="Row"
+        ):
+            start_at, end_at = self._build_datetime(
+                row.date, row.session, getattr(row, "time", None)
+            )
             events.append(
                 EarningsEvent(
                     symbol=row.symbol,
@@ -205,8 +213,12 @@ class FinnhubEarningsProvider(EarningsDataProvider):
         df["source"] = self.source_name
 
         events: List[EarningsEvent] = []
-        for row in df[["symbol", "date", "session", "source", "hour"]].itertuples(index=False, name="Row"):
-            start_at, end_at = self._build_datetime(row.date, row.session, getattr(row, "hour", None))
+        for row in df[["symbol", "date", "session", "source", "hour"]].itertuples(
+            index=False, name="Row"
+        ):
+            start_at, end_at = self._build_datetime(
+                row.date, row.session, getattr(row, "hour", None)
+            )
             events.append(
                 EarningsEvent(
                     symbol=row.symbol,

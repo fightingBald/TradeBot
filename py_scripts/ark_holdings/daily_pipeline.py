@@ -10,9 +10,17 @@ import shutil
 from pathlib import Path
 from typing import Dict, Iterable, List, Sequence
 
-from data_sources.ark_holdings import FUND_CSV, HoldingSnapshot, diff_snapshots, fetch_holdings_snapshot
+from data_sources.ark_holdings import (
+    FUND_CSV,
+    HoldingSnapshot,
+    diff_snapshots,
+    fetch_holdings_snapshot,
+)
 from data_sources.ark_holdings.diff import HoldingChange
-from data_sources.ark_holdings.io import load_snapshot_folder, snapshot_collection_to_folder
+from data_sources.ark_holdings.io import (
+    load_snapshot_folder,
+    snapshot_collection_to_folder,
+)
 from notification_svc import (
     EmailAttachment,
     EmailDeliveryError,
@@ -25,7 +33,9 @@ logger = logging.getLogger("ark_pipeline")
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Fetch, diff, and persist ARK ETF holdings snapshots.")
+    parser = argparse.ArgumentParser(
+        description="Fetch, diff, and persist ARK ETF holdings snapshots."
+    )
     parser.add_argument(
         "--baseline-dir",
         default="baseline_snapshots",
@@ -51,7 +61,9 @@ def parse_args() -> argparse.Namespace:
         help="Comma separated ETF symbols to process (default: all).",
     )
     parser.add_argument("--timeout", type=int, default=30, help="HTTP timeout seconds.")
-    parser.add_argument("--top", type=int, default=10, help="Top N changes shown per ETF.")
+    parser.add_argument(
+        "--top", type=int, default=10, help="Top N changes shown per ETF."
+    )
     parser.add_argument(
         "--weight-threshold",
         type=float,
@@ -103,9 +115,13 @@ def main() -> None:
 
     baseline_snapshots = load_snapshot_folder(args.baseline_dir)
     if baseline_snapshots:
-        logger.info("Loaded baseline snapshots for: %s", ", ".join(sorted(baseline_snapshots)))
+        logger.info(
+            "Loaded baseline snapshots for: %s", ", ".join(sorted(baseline_snapshots))
+        )
     else:
-        logger.warning("No baseline snapshots found at %s (first run?)", args.baseline_dir)
+        logger.warning(
+            "No baseline snapshots found at %s (first run?)", args.baseline_dir
+        )
 
     output_dir = Path(args.output_dir)
     if output_dir.exists():
@@ -142,7 +158,9 @@ def main() -> None:
 
     summary_json_path = Path(args.summary_json)
     summary_json_path.parent.mkdir(parents=True, exist_ok=True)
-    summary_json_path.write_text(json.dumps({"etfs": reports}, ensure_ascii=False, indent=2), encoding="utf-8")
+    summary_json_path.write_text(
+        json.dumps({"etfs": reports}, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
     logger.info("Wrote summary json: %s", summary_json_path)
 
     snapshot_collection_to_folder(new_snapshots, output_dir)
@@ -163,7 +181,9 @@ def main() -> None:
 def _determine_symbols(symbols_arg: str | None) -> List[str]:
     if not symbols_arg:
         return list(FUND_CSV.keys())
-    symbols = [token.strip().upper() for token in symbols_arg.split(",") if token.strip()]
+    symbols = [
+        token.strip().upper() for token in symbols_arg.split(",") if token.strip()
+    ]
     invalid = [symbol for symbol in symbols if symbol not in FUND_CSV]
     if invalid:
         raise ValueError(f"不支持的 ETF: {', '.join(invalid)}")
@@ -186,13 +206,19 @@ def _build_etf_report(
         "changes": [change_to_dict(change) for change in changes],
         "top_buys": [change_to_dict(change) for change in buys[:top_n]],
         "top_sells": [change_to_dict(change) for change in sells[:top_n]],
-        "new_positions": [change_to_dict(change) for change in changes if change.action == "new"],
-        "exited_positions": [change_to_dict(change) for change in changes if change.action == "exit"],
+        "new_positions": [
+            change_to_dict(change) for change in changes if change.action == "new"
+        ],
+        "exited_positions": [
+            change_to_dict(change) for change in changes if change.action == "exit"
+        ],
     }
     return report
 
 
-def _split_changes(changes: Sequence[HoldingChange]) -> tuple[List[HoldingChange], List[HoldingChange]]:
+def _split_changes(
+    changes: Sequence[HoldingChange],
+) -> tuple[List[HoldingChange], List[HoldingChange]]:
     buys: List[HoldingChange] = []
     sells: List[HoldingChange] = []
     for change in changes:
@@ -344,7 +370,12 @@ def _send_email_report(
         raise
 
 
-def _render_email_html(reports: Sequence[dict], snapshots: Dict[str, HoldingSnapshot], *, holdings_limit: int) -> str:
+def _render_email_html(
+    reports: Sequence[dict],
+    snapshots: Dict[str, HoldingSnapshot],
+    *,
+    holdings_limit: int,
+) -> str:
     lines: List[str] = [
         "<html><body>",
         "<h1>ARK Holdings Daily Diff</h1>",
@@ -401,7 +432,9 @@ def _render_email_html(reports: Sequence[dict], snapshots: Dict[str, HoldingSnap
         snapshot = snapshots.get(report["etf"])
         if snapshot:
             lines.append(f"<h3>最新持仓概览（权重 Top {holdings_limit}）</h3>")
-            holdings_sorted = sorted(snapshot.holdings, key=lambda h: h.weight or 0.0, reverse=True)
+            holdings_sorted = sorted(
+                snapshot.holdings, key=lambda h: h.weight or 0.0, reverse=True
+            )
             lines.append(
                 "<table border='1' cellpadding='4' cellspacing='0'>"
                 "<thead><tr>"

@@ -27,7 +27,9 @@ def test_parse_symbols_normalizes_and_deduplicates():
 
 def test_load_env_file_populates_environment(tmp_path, monkeypatch):
     env_file = tmp_path / ".env"
-    env_file.write_text("NEW_VAR=value\nEXISTING=should_not_override\n", encoding="utf-8")
+    env_file.write_text(
+        "NEW_VAR=value\nEXISTING=should_not_override\n", encoding="utf-8"
+    )
     monkeypatch.setenv("EXISTING", "keep")
     monkeypatch.delenv("NEW_VAR", raising=False)
 

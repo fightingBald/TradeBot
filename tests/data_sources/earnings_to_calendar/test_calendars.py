@@ -38,7 +38,9 @@ def test_build_ics_generates_expected_fields():
 
 def test_google_insert_creates_calendar_when_missing(monkeypatch):
     service = StubGoogleService()
-    monkeypatch.setattr(calendars_mod, "_get_google_service", lambda *args, **kwargs: service)
+    monkeypatch.setattr(
+        calendars_mod, "_get_google_service", lambda *args, **kwargs: service
+    )
 
     ny = ZoneInfo("America/New_York")
     event = EarningsEvent(
@@ -73,7 +75,9 @@ def test_google_insert_creates_calendar_when_missing(monkeypatch):
 
 def test_google_insert_upserts_existing(monkeypatch):
     service = StubGoogleService({"primary": "Primary"})
-    monkeypatch.setattr(calendars_mod, "_get_google_service", lambda *args, **kwargs: service)
+    monkeypatch.setattr(
+        calendars_mod, "_get_google_service", lambda *args, **kwargs: service
+    )
 
     ny = ZoneInfo("America/New_York")
     base_event = EarningsEvent(

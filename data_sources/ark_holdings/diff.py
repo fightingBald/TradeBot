@@ -78,7 +78,9 @@ def diff_snapshots(
                     action="exit",
                     shares_change=-(prev.shares or 0.0),
                     weight_change=-(prev.weight or 0.0),
-                    market_value_change=-(prev.market_value or 0.0) if prev.market_value else None,
+                    market_value_change=(
+                        -(prev.market_value or 0.0) if prev.market_value else None
+                    ),
                     previous=prev,
                     current=None,
                 )
@@ -113,7 +115,9 @@ def diff_snapshots(
     return changes
 
 
-def summarize_changes(changes: Iterable[HoldingChange], *, top_n: int = 10) -> Dict[str, List[HoldingChange]]:
+def summarize_changes(
+    changes: Iterable[HoldingChange], *, top_n: int = 10
+) -> Dict[str, List[HoldingChange]]:
     """Split changes into buys and sells sorted by absolute weight change."""
 
     buys: List[HoldingChange] = []

@@ -15,7 +15,9 @@ class Holding(BaseModel):
     etf: str = Field(..., description="ETF symbol, e.g. ARKK.")
     company: str = Field(..., description="Company name as reported by ARK.")
     ticker: str = Field(..., description="Ticker symbol.")
-    cusip: Optional[str] = Field(default=None, description="CUSIP identifier when available.")
+    cusip: Optional[str] = Field(
+        default=None, description="CUSIP identifier when available."
+    )
     shares: Optional[float] = Field(default=None, description="Number of shares held.")
     market_value: Optional[float] = Field(
         default=None, description="Market value in USD as reported by ARK."

@@ -59,7 +59,9 @@ def fetch_holdings_snapshot(etf: str, *, timeout: int = 30) -> HoldingSnapshot:
             price=row.get("price"),
         )
         holdings.append(holding)
-    logger.info("Fetched %d holdings for %s as of %s", len(holdings), etf_upper, as_of_date)
+    logger.info(
+        "Fetched %d holdings for %s as of %s", len(holdings), etf_upper, as_of_date
+    )
     return HoldingSnapshot(etf=etf_upper, as_of=as_of_date, holdings=holdings)
 
 

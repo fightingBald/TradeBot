@@ -11,7 +11,11 @@ from typing import Iterable, List, Sequence
 import requests
 from zoneinfo import ZoneInfo
 
-from .defaults import DEFAULT_EVENT_DURATION_MINUTES, DEFAULT_TIMEOUT_SECONDS, USER_AGENT
+from .defaults import (
+    DEFAULT_EVENT_DURATION_MINUTES,
+    DEFAULT_TIMEOUT_SECONDS,
+    USER_AGENT,
+)
 from .domain import EarningsEvent
 from .logging_utils import get_logger
 from .settings import RuntimeOptions
@@ -30,7 +34,11 @@ class MacroRule:
 
 def _default_rules() -> List[MacroRule]:
     return [
-        MacroRule("FOMC", "FOMC", ("fomc", "fed interest rate decision", "federal reserve interest rate")),
+        MacroRule(
+            "FOMC",
+            "FOMC",
+            ("fomc", "fed interest rate decision", "federal reserve interest rate"),
+        ),
         MacroRule("ECB", "ECB", ("ecb", "european central bank")),
         MacroRule("BOE", "BOE", ("boe", "bank of england")),
         MacroRule("BOJ", "BOJ", ("boj", "bank of japan")),
@@ -41,7 +49,13 @@ def _default_rules() -> List[MacroRule]:
         MacroRule(
             "ISM",
             "ISM",
-            ("ism manufacturing", "ism non-manufacturing", "ism services", "ism manufacturing pmi", "ism services pmi"),
+            (
+                "ism manufacturing",
+                "ism non-manufacturing",
+                "ism services",
+                "ism manufacturing pmi",
+                "ism services pmi",
+            ),
         ),
         MacroRule(
             "Treasury",
@@ -97,7 +111,9 @@ def _slugify(text: str) -> str:
     return slug or "MACRO"
 
 
-def _parse_event_datetime(raw: str | None, tz: ZoneInfo) -> tuple[date | None, datetime | None]:
+def _parse_event_datetime(
+    raw: str | None, tz: ZoneInfo
+) -> tuple[date | None, datetime | None]:
     if not raw:
         return None, None
     text = raw.strip()
@@ -141,7 +157,9 @@ def _build_notes(item: dict) -> str:
     return "; ".join(parts) if parts else "Macro event from FMP economic calendar"
 
 
-def fetch_macro_events(start: date, end: date, options: RuntimeOptions) -> List[EarningsEvent]:
+def fetch_macro_events(
+    start: date, end: date, options: RuntimeOptions
+) -> List[EarningsEvent]:
     api_key = os.getenv("FMP_API_KEY")
     if not api_key:
         logger.error("缺少 FMP_API_KEY，无法拉取宏观经济事件")
@@ -170,7 +188,9 @@ def fetch_macro_events(start: date, end: date, options: RuntimeOptions) -> List[
         return []
 
     tz = ZoneInfo(options.source_timezone)
-    duration = timedelta(minutes=options.event_duration_minutes or DEFAULT_EVENT_DURATION_MINUTES)
+    duration = timedelta(
+        minutes=options.event_duration_minutes or DEFAULT_EVENT_DURATION_MINUTES
+    )
     rules = _select_rules(options.macro_event_keywords)
     events: List[EarningsEvent] = []
 

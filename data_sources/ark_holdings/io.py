@@ -31,7 +31,9 @@ def snapshot_to_dataframe(snapshot: HoldingSnapshot) -> pd.DataFrame:
     ]
     df = pd.DataFrame(rows)
     if df.empty:
-        logger.warning("Snapshot for %s on %s contains no holdings.", snapshot.etf, snapshot.as_of)
+        logger.warning(
+            "Snapshot for %s on %s contains no holdings.", snapshot.etf, snapshot.as_of
+        )
     return df
 
 
@@ -84,7 +86,9 @@ def write_snapshot_csv(snapshot: HoldingSnapshot, path: str | Path) -> None:
     logger.debug("Wrote snapshot csv: %s (rows=%d)", csv_path, len(df))
 
 
-def snapshot_collection_to_folder(snapshots: Mapping[str, HoldingSnapshot], folder: str | Path) -> None:
+def snapshot_collection_to_folder(
+    snapshots: Mapping[str, HoldingSnapshot], folder: str | Path
+) -> None:
     """Persist a mapping of ETF -> snapshot into a folder of CSV files."""
     target = Path(folder)
     target.mkdir(parents=True, exist_ok=True)

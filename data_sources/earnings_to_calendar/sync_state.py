@@ -102,7 +102,12 @@ def load_sync_state(path: str | None) -> SyncState:
 
 
 def _now_iso_utc() -> str:
-    return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+    return (
+        datetime.now(timezone.utc)
+        .replace(microsecond=0)
+        .isoformat()
+        .replace("+00:00", "Z")
+    )
 
 
 def build_sync_state(

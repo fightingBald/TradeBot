@@ -32,7 +32,9 @@ def main() -> None:
     output_dir.mkdir(parents=True, exist_ok=True)
 
     if args.etfs:
-        symbols = [token.strip().upper() for token in args.etfs.split(",") if token.strip()]
+        symbols = [
+            token.strip().upper() for token in args.etfs.split(",") if token.strip()
+        ]
     else:
         symbols = list(FUND_CSV.keys())
 
