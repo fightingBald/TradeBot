@@ -197,20 +197,25 @@ def _build_etf_report(
     changes: Sequence[HoldingChange],
     top_n: int,
 ) -> dict:
-    buys, sells = _split_changes(changes)
+    filtered_changes = [change for change in changes if _is_meaningful_change(change)]
+    buys, sells = _split_changes(filtered_changes)
     report = {
         "etf": symbol,
         "current_as_of": current.as_of.isoformat(),
         "baseline_as_of": baseline.as_of.isoformat() if baseline else None,
         "total_holdings": len(current.holdings),
-        "changes": [change_to_dict(change) for change in changes],
+        "changes": [change_to_dict(change) for change in filtered_changes],
         "top_buys": [change_to_dict(change) for change in buys[:top_n]],
         "top_sells": [change_to_dict(change) for change in sells[:top_n]],
         "new_positions": [
-            change_to_dict(change) for change in changes if change.action == "new"
+            change_to_dict(change)
+            for change in filtered_changes
+            if change.action == "new"
         ],
         "exited_positions": [
-            change_to_dict(change) for change in changes if change.action == "exit"
+            change_to_dict(change)
+            for change in filtered_changes
+            if change.action == "exit"
         ],
     }
     return report
@@ -251,18 +256,30 @@ def change_to_dict(change: HoldingChange) -> Dict[str, object]:
     }
 
 
+def _is_meaningful_change(change: HoldingChange) -> bool:
+    ticker = (change.ticker or "").strip()
+    if not ticker or ticker.upper() == "NAN":
+        return False
+    weight = abs(change.weight_change or 0.0)
+    shares = abs(change.shares_change or 0.0)
+    return weight > 1e-9 or shares >= 1.0
+
+
+def _is_meaningful_change_dict(change: dict) -> bool:
+    ticker = (change.get("ticker") or "").strip()
+    if not ticker or ticker.upper() == "NAN":
+        return False
+    weight = abs(change.get("weight_change") or 0.0)
+    shares = abs(change.get("shares_change") or 0.0)
+    return weight > 1e-9 or shares >= 1.0
+
 def _build_global_summary(reports: Sequence[dict], top_n: int) -> dict:
     buys: List[dict] = []
     sells: List[dict] = []
 
     for report in reports:
         for change in report["changes"]:
-            ticker = change.get("ticker") or ""
-            weight = change.get("weight_change")
-            if not ticker or weight is None:
-                continue
-            shares = change.get("shares_change")
-            if abs(weight) < 1e-9 and abs(shares or 0.0) < 1.0:
+            if not _is_meaningful_change_dict(change):
                 continue
             entry = dict(change)
             entry["etf"] = change.get("etf") or report["etf"]
@@ -274,10 +291,6 @@ def _build_global_summary(reports: Sequence[dict], top_n: int) -> dict:
     key = lambda ch: abs(ch.get("weight_change") or 0.0)
     buys.sort(key=key, reverse=True)
     sells.sort(key=key, reverse=True)
-
-    if top_n > 0:
-        buys = buys[:top_n]
-        sells = sells[:top_n]
 
     return {"buys": buys, "sells": sells}
 
@@ -314,17 +327,11 @@ def _render_report_section(report: dict) -> List[str]:
     lines.append(f"- 新进标的：{len(new_positions)} 个")
     lines.append(f"- 清仓标的：{len(exited_positions)} 个")
 
-    if report["top_buys"]:
+    if report["changes"]:
         lines.append("")
-        lines.append(f"### 增持 Top {len(report['top_buys'])}")
-        lines.extend(_format_table(report["top_buys"]))
-
-    if report["top_sells"]:
-        lines.append("")
-        lines.append(f"### 减持 Top {len(report['top_sells'])}")
-        lines.extend(_format_table(report["top_sells"]))
-
-    if not report["top_buys"] and not report["top_sells"]:
+        lines.append("### 持仓变化（按权重绝对值排序）")
+        lines.extend(_format_table(report["changes"]))
+    else:
         lines.append("")
         lines.append("> 无超过阈值的增减持。")
 
@@ -333,8 +340,8 @@ def _render_report_section(report: dict) -> List[str]:
 
 
 def _format_table(entries: Sequence[dict]) -> List[str]:
-    header = "| Ticker | Company | Action | Shares Δ | Weight Δ | MV Δ |"
-    separator = "| --- | --- | --- | --- | --- | --- |"
+    header = "| Ticker | Company | Action | Shares Δ | Weight Δ | MV Δ | ETF |"
+    separator = "| --- | --- | --- | --- | --- | --- | --- |"
     rows = [header, separator]
     for entry in entries:
         shares = entry["shares_change"] or 0.0
@@ -343,7 +350,7 @@ def _format_table(entries: Sequence[dict]) -> List[str]:
         mv_display = f"${mv:,.0f}" if mv is not None else "N/A"
         rows.append(
             f"| {entry['ticker']} | {entry['company']} | {entry['action']} | "
-            f"{shares:,.0f} | {weight:.4f} | {mv_display} |"
+            f"{shares:,.0f} | {weight:.4f} | {mv_display} | {entry.get('etf')} |"
         )
     return rows
 
@@ -354,14 +361,14 @@ def _render_markdown_global(summary: dict) -> List[str]:
     sells = summary.get("sells", [])
 
     if buys:
-        lines.append(f"### 增持 Top {len(buys)}")
+        lines.append("### 增持明细")
         lines.extend(_format_global_table(buys, include_new=True))
         lines.append("")
     else:
         lines.append("- 增持：无显著变动")
 
     if sells:
-        lines.append(f"### 减持 Top {len(sells)}")
+        lines.append("### 减持明细")
         lines.extend(_format_global_table(sells, include_exit=True))
         lines.append("")
     else:
@@ -376,14 +383,15 @@ def _format_global_table(
     include_new: bool = False,
     include_exit: bool = False,
 ) -> List[str]:
+    left = "| Ticker | Company | Action | Shares Δ | Weight Δ | MV Δ | ETF |"
     if include_new:
-        header = "| ETF | Ticker | Company | Action | Shares Δ | Weight Δ | MV Δ | 新进? |"
+        header = left[:-1] + " 新进? |"
         separator = "| --- | --- | --- | --- | --- | --- | --- | --- |"
     elif include_exit:
-        header = "| ETF | Ticker | Company | Action | Shares Δ | Weight Δ | MV Δ | 清仓? |"
+        header = left[:-1] + " 清仓? |"
         separator = "| --- | --- | --- | --- | --- | --- | --- | --- |"
     else:
-        header = "| ETF | Ticker | Company | Action | Shares Δ | Weight Δ | MV Δ |"
+        header = left
         separator = "| --- | --- | --- | --- | --- | --- | --- |"
     rows = [header, separator]
     for entry in entries:
@@ -397,8 +405,8 @@ def _format_global_table(
         elif include_exit:
             indicator = "✅" if entry.get("is_exit") else ""
         rows.append(
-            f"| {entry['etf']} | {entry['ticker']} | {entry['company']} | {entry['action']} | "
-            f"{shares:,.0f} | {weight:.4f} | {mv_display} | {indicator} |"
+            f"| {entry['ticker']} | {entry['company']} | {entry['action']} | "
+            f"{shares:,.0f} | {weight:.4f} | {mv_display} | {entry['etf']} | {indicator} |"
         )
     return rows
 
@@ -602,8 +610,9 @@ def _format_global_html_table(
     rows = [
         "<table border='1' cellpadding='4' cellspacing='0'>",
         "<thead><tr>"
-        "<th>ETF</th><th>Ticker</th><th>Company</th><th>Action</th>"
+        "<th>Ticker</th><th>Company</th><th>Action</th>"
         "<th>Shares Δ</th><th>Weight Δ</th><th>MV Δ</th>"
+        "<th>ETF</th>"
         f"<th>{header_extra}</th>"
         "</tr></thead><tbody>",
     ]
@@ -619,13 +628,13 @@ def _format_global_html_table(
             indicator = "✅" if entry.get("is_exit") else ""
         rows.append(
             "<tr>"
-            f"<td>{html.escape(entry['etf'])}</td>"
             f"<td>{html.escape(entry['ticker'])}</td>"
             f"<td>{html.escape(entry['company'])}</td>"
             f"<td>{html.escape(entry['action'])}</td>"
             f"<td>{shares:,.0f}</td>"
             f"<td>{weight:.4f}</td>"
             f"<td>{mv_display}</td>"
+            f"<td>{html.escape(entry['etf'])}</td>"
             f"<td>{indicator}</td>"
             "</tr>"
         )
