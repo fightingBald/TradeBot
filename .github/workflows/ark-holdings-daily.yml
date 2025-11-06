@@ -71,17 +71,7 @@ jobs:
           BASELINE_PATH="baseline/${BASELINE_NAME}/${BASELINE_DIRECTORY}"
 
           FUND_LIST_CLEAN="$(echo "${FUND_LIST:-}" | tr -d '[:space:]')"
-
-          WEIGHT_THRESHOLD="$(python - <<'PY'
-import os
-value = os.environ.get("MIN_WEIGHT_BP", "").strip()
-try:
-    bp = int(value) if value else 1
-except ValueError:
-    bp = 1
-print(bp / 10000)
-PY
-)"
+          WEIGHT_THRESHOLD="$(python -c "import os; v=os.environ.get('MIN_WEIGHT_BP','').strip(); bp=int(v) if v.isdigit() else 1; print(bp/10000)")"
 
           SHARE_THRESHOLD="${MIN_SHARE_DELTA:-1}"
 
