@@ -318,6 +318,7 @@ def _send_email_report(
         logger.warning("收件人列表为空，跳过发送邮件。")
         return
 
+    _sanitize_email_environment()
     try:
         settings = EmailSettings()
     except Exception as exc:  # pragma: no cover - settings validation
@@ -487,6 +488,23 @@ def _split_addresses(raw: str) -> List[str]:
     if not raw:
         return []
     return [addr.strip() for addr in raw.split(",") if addr.strip()]
+
+
+def _sanitize_email_environment() -> None:
+    """Remove empty EMAIL_* values to avoid pydantic parsing errors."""
+    for key in (
+        "EMAIL_HOST",
+        "EMAIL_PORT",
+        "EMAIL_SENDER",
+        "EMAIL_USE_TLS",
+        "EMAIL_USE_SSL",
+        "EMAIL_MAX_RETRIES",
+        "EMAIL_USERNAME",
+        "EMAIL_PASSWORD",
+    ):
+        value = os.environ.get(key)
+        if value is not None and value.strip() == "":
+            del os.environ[key]
 
 
 if __name__ == "__main__":

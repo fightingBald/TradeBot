@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from datetime import date
 
 import pytest
@@ -8,6 +9,7 @@ from data_sources.ark_holdings import Holding, HoldingSnapshot, diff_snapshots
 from py_scripts.ark_holdings.daily_pipeline import (_build_etf_report,
                                                     _render_email_html,
                                                     _resolve_recipients,
+                                                    _sanitize_email_environment,
                                                     change_to_dict)
 
 
@@ -110,3 +112,10 @@ def test_resolve_recipients_env_fallback(monkeypatch, tmp_path):
     assert recipients.to == ["foo@example.com", "bar@example.com"]
     assert recipients.cc == []
     assert recipients.bcc == ["bcc@example.com"]
+
+
+def test_sanitize_email_environment(monkeypatch):
+    monkeypatch.setenv("EMAIL_MAX_RETRIES", "")
+    monkeypatch.setenv("EMAIL_HOST", "smtp.example.com")
+    _sanitize_email_environment()
+    assert "EMAIL_MAX_RETRIES" not in os.environ
