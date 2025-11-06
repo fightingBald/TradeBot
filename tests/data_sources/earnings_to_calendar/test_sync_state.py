@@ -1,11 +1,9 @@
 from datetime import date, datetime
 from zoneinfo import ZoneInfo
 
-from data_sources.earnings_to_calendar.domain import EarningsEvent
-from data_sources.earnings_to_calendar.sync_state import (build_sync_state,
-                                                          diff_events,
-                                                          load_sync_state,
-                                                          save_sync_state)
+from src.earnings.calendar.domain import EarningsEvent
+from src.earnings.calendar.sync_state import (build_sync_state, diff_events,
+                                              load_sync_state, save_sync_state)
 
 
 def _sample_event(symbol: str = "AAPL", *, notes: str | None = None) -> EarningsEvent:

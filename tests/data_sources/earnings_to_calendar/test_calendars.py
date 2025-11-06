@@ -1,9 +1,9 @@
 from datetime import date, datetime
 from zoneinfo import ZoneInfo
 
-import data_sources.earnings_to_calendar.calendars as calendars_mod
-from data_sources.earnings_to_calendar.calendars import build_ics
-from data_sources.earnings_to_calendar.domain import EarningsEvent
+import src.earnings.calendar.calendars as calendars_mod
+from src.earnings.calendar.calendars import build_ics
+from src.earnings.calendar.domain import EarningsEvent
 
 from .conftest import StubGoogleService
 

@@ -2,8 +2,8 @@ from datetime import date
 
 import pytest
 
-from data_sources.earnings_to_calendar.macro_events import fetch_macro_events
-from data_sources.earnings_to_calendar.settings import RuntimeOptions
+from src.earnings.calendar.macro_events import fetch_macro_events
+from src.earnings.calendar.settings import RuntimeOptions
 
 
 class _Response:
@@ -75,9 +75,7 @@ def test_fetch_macro_events_filters_known_events(monkeypatch):
         captured["timeout"] = timeout
         return _Response(payload)
 
-    monkeypatch.setattr(
-        "data_sources.earnings_to_calendar.macro_events.requests.get", fake_get
-    )
+    monkeypatch.setattr("src.earnings.calendar.macro_events.requests.get", fake_get)
 
     options = _base_options()
     events = fetch_macro_events(date(2024, 9, 1), date(2024, 9, 30), options)
@@ -104,7 +102,7 @@ def test_fetch_macro_events_supports_custom_keywords(monkeypatch):
     ]
 
     monkeypatch.setattr(
-        "data_sources.earnings_to_calendar.macro_events.requests.get",
+        "src.earnings.calendar.macro_events.requests.get",
         lambda *args, **kwargs: _Response(payload),
     )
 

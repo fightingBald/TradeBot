@@ -5,7 +5,7 @@ from datetime import date
 
 import pytest
 
-from data_sources.ark_holdings import Holding, HoldingSnapshot, diff_snapshots
+from src.ark.holdings import Holding, HoldingSnapshot, diff_snapshots
 from py_scripts.ark_holdings.daily_pipeline import (_build_etf_report,
                                                     _render_email_html,
                                                     _resolve_recipients,

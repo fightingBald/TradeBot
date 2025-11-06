@@ -11,14 +11,14 @@ import shutil
 from pathlib import Path
 from typing import Dict, Iterable, List, Sequence
 
-from data_sources.ark_holdings import (FUND_CSV, HoldingSnapshot,
-                                       diff_snapshots, fetch_holdings_snapshot)
-from data_sources.ark_holdings.diff import HoldingChange
-from data_sources.ark_holdings.io import (load_snapshot_folder,
-                                          snapshot_collection_to_folder)
-from notification_svc import (EmailAttachment, EmailDeliveryError,
-                              EmailNotificationService, EmailSettings,
-                              RecipientConfig, load_recipient_config)
+from src.ark.holdings import (FUND_CSV, HoldingSnapshot, diff_snapshots,
+                              fetch_holdings_snapshot)
+from src.ark.holdings.diff import HoldingChange
+from src.ark.holdings.io import (load_snapshot_folder,
+                                 snapshot_collection_to_folder)
+from src.notifications import (EmailAttachment, EmailDeliveryError,
+                               EmailNotificationService, EmailSettings,
+                               RecipientConfig, load_recipient_config)
 
 logger = logging.getLogger("ark_pipeline")
 
@@ -76,7 +76,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--send-email",
         action="store_true",
-        help="Send summary email using notification_svc. Requires EMAIL_* env vars.",
+        help="Send summary email using notification module (requires EMAIL_* env vars).",
     )
     parser.add_argument(
         "--recipient-config",

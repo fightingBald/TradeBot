@@ -19,7 +19,7 @@
 2. 代码里这样用：
 
    ```python
-   from notification_svc import EmailNotificationService, EmailSettings
+   from src.notifications import EmailNotificationService, EmailSettings
 
    settings = EmailSettings()          # 自动读取 EMAIL_* 配置
    mailer = EmailNotificationService(settings)
@@ -34,7 +34,7 @@
    如果想发 HTML、CC/BCC 或带附件，也可以：
 
    ```python
-   from notification_svc import EmailAttachment
+   from src.notifications import EmailAttachment
 
    mailer.send_email(
        subject="每日盈亏汇总",
@@ -74,7 +74,7 @@
 发邮件失败会抛 `EmailDeliveryError`，日志里也会记录每次尝试的失败原因。可以在业务层捕获它做降级，比如：先写入数据库、稍后重试。
 
 ```python
-from notification_svc import EmailDeliveryError
+from src.notifications import EmailDeliveryError
 
 try:
     mailer.send_email(...略)

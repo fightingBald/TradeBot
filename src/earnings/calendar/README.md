@@ -23,13 +23,13 @@
 运行帮助查看全部参数：
 ```bash
 cd /path/to/AlpacaTrading
-python -m data_sources.earnings_to_calendar --help
+python -m earnings.calendar --help
 ```
 
 典型拉取命令：
 ```bash
 cd /path/to/AlpacaTrading
-python -m data_sources.earnings_to_calendar \
+python -m earnings.calendar \
   --symbols=AAPL,MSFT,NVDA \
   --source=fmp \
   --days=90 \
@@ -64,7 +64,7 @@ TOML 支持 `#` 注释，可按需启用/关闭字段，也可以通过 `--confi
 运行时只需覆盖想临时调整的字段（TOML 支持 `#` 注释，方便禁用配置）：
 ```bash
 cd /path/to/AlpacaTrading
-python -m data_sources.earnings_to_calendar --config=config/earnings_to_calendar.toml
+python -m earnings.calendar --config=config/earnings_to_calendar.toml
 ```
 若命令行提供了相同参数，将优先覆盖配置文件内的数值。
 
@@ -97,7 +97,7 @@ python -m data_sources.earnings_to_calendar --config=config/earnings_to_calendar
 3. 第一次运行命令：
    ```bash
    cd /path/to/AlpacaTrading
-      python -m data_sources.earnings_to_calendar \
+      python -m earnings.calendar \
         --symbols=AAPL,MSFT,NVDA \
         --source=fmp \
         --google-insert \
@@ -111,7 +111,7 @@ python -m data_sources.earnings_to_calendar --config=config/earnings_to_calendar
 5. 想要固定配置？直接编辑 `config/earnings_to_calendar.toml`（仓库已给出示例），以后直接：
    ```bash
    cd /path/to/AlpacaTrading
-   python -m data_sources.earnings_to_calendar --config=config/earnings_to_calendar.toml --env-file=.env --log-level=INFO
+   python -m earnings.calendar --config=config/earnings_to_calendar.toml --env-file=.env --log-level=INFO
    ```
    （相对路径如 `secrets/credentials.json` 会自动按项目根目录解析，若需要其他位置请使用绝对路径或写成 `../path/to/file`。`--log-level` 支持 `DEBUG|INFO|WARNING|ERROR|CRITICAL`，便于调试请求；如需自动创建并写入指定名称的日历，可配合 `--google-calendar-name` 与 `--google-create-calendar`。）
 6. 想要顺便导出备份？加上 `--export-ics=earnings.ics` 就会多生成一个 ICS 文件。
@@ -126,12 +126,11 @@ python -m data_sources.earnings_to_calendar --config=config/earnings_to_calendar
 - `settings.py`：解析 `.env`、配置文件与 CLI 参数，产出 `RuntimeOptions`。
 - `runner.py`：主业务编排（拉取数据、写 ICS/Google/iCloud），并输出运行概要。
 - `calendars.py`：ICS 构建与 Google/iCloud 写入逻辑。
-- `macro_events.py`：抓取并归一化宏观经济事件（FOMC / CPI / NFP 等）。
 - `sync_state.py`：管理增量同步状态文件与差异计算。
 - `cli.py`：命令行入口，负责解析参数与调用 `runner.run()`。
 - `__init__.py`：对外统一导出。
 
 可直接在其他模块中导入：
 ```python
-from data_sources.earnings_to_calendar import FmpEarningsProvider, build_ics
+from src.earnings.calendar import FmpEarningsProvider, build_ics
 ```

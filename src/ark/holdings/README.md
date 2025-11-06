@@ -12,7 +12,7 @@
 ## 🔧 快速上手
 
 ```python
-from data_sources.ark_holdings import fetch_holdings_snapshot
+from src.ark.holdings import fetch_holdings_snapshot
 
 snapshot = fetch_holdings_snapshot("ARKK")
 print(snapshot.as_of)             # => datetime.date
@@ -23,7 +23,7 @@ print(snapshot.holdings[0].ticker)
 批量抓取：
 
 ```python
-from data_sources.ark_holdings import FUND_CSV, fetch_holdings_snapshot
+from src.ark.holdings import FUND_CSV, fetch_holdings_snapshot
 
 all_snapshots = {etf: fetch_holdings_snapshot(etf) for etf in FUND_CSV}
 ```
@@ -59,4 +59,3 @@ ARK 官方 CSV 通常在**每个交易日收盘后**更新一次。周末或节�
 
 - `tests/data_sources/ark_holdings/test_transform.py`：验证列名、数值清洗。
 - `tests/data_sources/ark_holdings/test_provider.py`：Mock HTTP，确认快照结构正确。
-

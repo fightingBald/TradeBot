@@ -3,14 +3,12 @@ import os
 from pathlib import Path
 from types import SimpleNamespace
 
-from data_sources.earnings_to_calendar.defaults import (
+from src.earnings.calendar.defaults import (
     DEFAULT_EVENT_DURATION_MINUTES, DEFAULT_LOOKAHEAD_DAYS,
     DEFAULT_SESSION_TIMES, DEFAULT_SOURCE_TIMEZONE, DEFAULT_TARGET_TIMEZONE)
-from data_sources.earnings_to_calendar.settings import (RuntimeOptions,
-                                                        build_runtime_options,
-                                                        load_config,
-                                                        load_env_file,
-                                                        parse_symbols)
+from src.earnings.calendar.settings import (RuntimeOptions,
+                                            build_runtime_options, load_config,
+                                            load_env_file, parse_symbols)
 
 
 def test_parse_symbols_normalizes_and_deduplicates():

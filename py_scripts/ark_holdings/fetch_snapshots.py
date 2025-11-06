@@ -9,9 +9,12 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
+SRC = ROOT / "src"
+if SRC.exists() and str(SRC) not in sys.path:
+    sys.path.insert(0, str(SRC))
 
-from data_sources.ark_holdings import FUND_CSV, fetch_holdings_snapshot
-from data_sources.ark_holdings.io import snapshot_to_dataframe
+from src.ark.holdings import FUND_CSV, fetch_holdings_snapshot
+from src.ark.holdings.io import snapshot_to_dataframe
 
 
 def main() -> None:

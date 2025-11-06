@@ -1,11 +1,11 @@
 from datetime import date, datetime, timedelta
 from zoneinfo import ZoneInfo
 
-from data_sources.earnings_to_calendar.defaults import (
+from src.earnings.calendar.defaults import (
     DEFAULT_EVENT_DURATION_MINUTES, DEFAULT_SESSION_TIMES,
     DEFAULT_SOURCE_TIMEZONE)
-from data_sources.earnings_to_calendar.providers import (
-    FinnhubEarningsProvider, FmpEarningsProvider)
+from src.earnings.calendar.providers import (FinnhubEarningsProvider,
+                                             FmpEarningsProvider)
 
 from .conftest import StubResponse
 
@@ -25,10 +25,7 @@ def test_fmp_provider_filters_and_normalizes(monkeypatch):
         captured["timeout"] = timeout
         return StubResponse(payload)
 
-    monkeypatch.setattr(
-        "data_sources.earnings_to_calendar.providers.httpx.get",
-        fake_httpx_get,
-    )
+    monkeypatch.setattr("src.earnings.calendar.providers.httpx.get", fake_httpx_get)
 
     provider = FmpEarningsProvider(
         "token",
@@ -62,7 +59,7 @@ def test_finnhub_provider_handles_nested_payload(monkeypatch):
     }
 
     monkeypatch.setattr(
-        "data_sources.earnings_to_calendar.providers.httpx.get",
+        "src.earnings.calendar.providers.httpx.get",
         lambda url, *, headers, timeout: StubResponse(payload),
     )
 

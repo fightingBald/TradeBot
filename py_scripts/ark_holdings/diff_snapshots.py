@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import argparse
 
-from data_sources.ark_holdings import diff_snapshots, summarize_changes
-from data_sources.ark_holdings.io import load_snapshot_csv
+from src.ark.holdings import diff_snapshots, summarize_changes
+from src.ark.holdings.io import load_snapshot_csv
 
 
 def main() -> None:

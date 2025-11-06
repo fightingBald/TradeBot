@@ -1,4 +1,4 @@
-"""Module entry point for python -m data_sources.earnings_to_calendar."""
+"""Module entry point for python -m earnings.calendar (and compatibility shim)."""
 
 from .cli import main
 

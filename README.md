@@ -76,41 +76,81 @@ Once running, the API provides:
   black --check app tests
   ```
 
-## Data Utilities
+## Project Layout
 
-- `data_sources/earnings_to_calendar` 提供了一个模块化的 CLI/库，用于从 FMP 或 Finnhub 抓取财报日程并导出到 ICS、Google Calendar 或 iCloud。运行 `python -m data_sources.earnings_to_calendar --help` 查看可用参数。默认配置集中在 `config/earnings_to_calendar.toml`（可设置 `source_timezone`、`target_timezone`、`event_duration_minutes` 以及 `session_times` 等），也可以通过 `--config=...` 指向其他文件。敏感信息建议写在 `.env`（参考 `.env.example`），CLI 会自动加载，也可以用 `--env-file` 指向其他路径。需要调试时可加 `--log-level=DEBUG`；要写入指定日历可传 `--google-calendar-name "Company Earnings" --google-create-calendar`，或直接提供 `--google-calendar-id`。
+- `app/` — FastAPI 层（配置、模型、服务、模板）。
+- `src/` — 共享业务模块：
+  - `src/ark/holdings/` — 木头姐 ETF 持仓抓取、清洗、差异化与 I/O。
+  - `src/earnings/calendar/` — 财报/宏观日程抓取、去重、日历输出。
+  - `src/notifications/` — 邮件通知实现与收件人配置。
+- `py_scripts/` — CLI & 作业脚本（在需要时把 `src` 加入 `sys.path`）。
+- `tests/` — 单元与集成测试，按模块就近布局。
+
+## Data Utilities & Automation
+
+### Earnings Calendar CLI
+
+- 入口：`src/earnings/calendar`。支持从 FMP/Finnhub 抓取财报或宏观事件并推送到 ICS / Google / iCloud。
+- 默认配置：`config/earnings_to_calendar.toml`（可覆盖时区、事件时长、会议时间等）。
+- 快速启动：
   ```bash
-  cd /path/to/AlpacaTrading
-  python -m data_sources.earnings_to_calendar \
+  python -m earnings.calendar \
     --config=config/earnings_to_calendar.toml \
     --env-file=.env \
     --google-insert \
     --market-events \
     --log-level=INFO
   ```
-  （参数在 TOML 中可随时注释/启用，命令行仅覆盖需要临时调整的字段。）
-- `notebooks/fmp_data_check.ipynb` 提供交互式示例，可快速验证本地 `FMP_API_KEY` 是否能成功拉取财报数据。
-- `py_scripts/ark_holdings/daily_pipeline.py` 整合了每日快照抓取、与基线比对、邮件通知以及 Markdown/JSON 摘要输出；配套的 GitHub Actions 工作流 `ARK Holdings Daily` 会在每个交易日收盘后运行该脚本、上传最新基线与摘要到 Artifact，并在上传前清理旧有 Artifact，确保仓库里始终只有一份最新基线。
+- 调试建议：通过 `--log-level=DEBUG` 或在 notebooks/fmp_data_check.ipynb 内验证 API Key。
 
-## Automation
+### ARK Holdings Automation
 
-### ARK Holdings Daily Run
+#### 使用步骤
 
-- 工作流名称：`ARK Holdings Daily`（`.github/workflows/ark-holdings-daily.yml`），默认在美股交易日的美东时间收盘后触发，也可手动 `workflow_dispatch`。
-- 工作流会自动：
-  - 下载上一份 Artifact 作为“最新基线”；
-  - 拉取当日全量持仓、计算与基线的全部变动并生成 Markdown/JSON 摘要；
-  - 将摘要写入 GitHub Job Summary、上传新的 Artifact，并在上传前删除旧有 `ark-holdings-baseline`；
-  - 若配置了 SMTP 凭据与收件人列表，会发送一封 HTML 邮件（正文含权重变化排序、持仓 Top N，附件包含 `diff_summary.md/json`）。
-- 需在仓库 Secrets 里配置以下键值（示例均为 Gmail）：
-  - `EMAIL_HOST`=`smtp.gmail.com`
-  - `EMAIL_PORT`=`587`
-  - `EMAIL_USERNAME`=`example@gmail.com`
-  - `EMAIL_PASSWORD`=`<应用专用密码>`
-  - `EMAIL_SENDER`=`example@gmail.com`
-  - （可选）`EMAIL_USE_TLS`=`true`、`EMAIL_USE_SSL`=`false`、`EMAIL_MAX_RETRIES`=`3`
-- 邮件收件人通过 `config/notification_recipients.toml` 管理，支持 To/Cc/Bcc；需要停用某个地址时直接注释掉即可。
-- CI 环境中如无法访问该 TOML，可通过仓库变量 `EMAIL_RECIPIENTS_TO` / `EMAIL_RECIPIENTS_CC` / `EMAIL_RECIPIENTS_BCC` 设置逗号分隔的邮件列表，脚本会自动回退到这些环境变量。
+1. **配置环境**  
+   - 在仓库 *Secrets* 中设置 `EMAIL_USERNAME`、`EMAIL_PASSWORD`（例如 Gmail 应用专用密码）。  
+   - 在仓库 *Variables* 中配置 SMTP 参数：`EMAIL_HOST`、`EMAIL_PORT`、`EMAIL_SENDER`、`EMAIL_USE_TLS`、`EMAIL_USE_SSL`、`EMAIL_MAX_RETRIES`。为空的变量会被自动忽略。  
+   - 配置收件人：  
+     - 本地：使用 `config/notification_recipients.toml`（含 To/Cc/Bcc）。  
+     - CI：若该文件不存在，则读取 `EMAIL_RECIPIENTS_TO` / `EMAIL_RECIPIENTS_CC` / `EMAIL_RECIPIENTS_BCC`（逗号分隔）。  
+   - 可选变量：  
+     - `EMAIL_ENABLED`（默认 `true`）  
+     - `FUND_LIST`（默认六只 ARK ETF）  
+     - `MIN_WEIGHT_BP`（权重阈值，单位基点）  
+     - `MIN_SHARE_DELTA`（持股阈值）  
+     - `BASELINE_ARTIFACT_NAME`、`BASELINE_DIR`、`OUTPUT_DIR`、`RETENTION_DAYS`
+
+2. **本地运行（可选）**  
+   ```bash
+   python py_scripts/ark_holdings/daily_pipeline.py \
+     --baseline-dir baseline_snapshots \
+     --output-dir out/latest \
+     --summary-path out/diff_summary.md \
+     --summary-json out/diff_summary.json \
+     --send-email
+   ```
+   命令将会抓取最新持仓，和 `baseline_snapshots` 下的基线对比，并（若启用）发送 HTML 报告，摘要会写入 `out/`。
+
+3. **GitHub Actions 调度**  
+   - 工作流：`.github/workflows/ark-holdings-daily.yml`
+   - 触发方式：  
+     - 定时：`cron: "5 1 * * 1-5"`（美股交易日收盘后约 21:05 美东时间）  
+     - 手动：Actions → ARK Holdings Daily → Run workflow
+   - 工作流会：  
+1. 下载上一份 Artifact 作为基线（若首次运行则跳过）；  
+2. 运行 `scripts/run_ark_pipeline.py`，由脚本解析环境变量后调用 `daily_pipeline`；  
+3. 生成 Markdown/JSON 摘要，写入 Job Summary；  
+4. 上传新的 Artifact（含最新快照与摘要），并删除旧版本，确保仅保留最新基线；  
+5. 当 `EMAIL_ENABLED=true` 且凭据完整时发送邮件播报。
+
+#### 实现思路
+
+- **数据抓取**：`src/ark/holdings/provider.py` 负责下载并清洗 ARK 官方 CSV；`src/ark/holdings/io.py` 将快照与 CSV 互转，便于 Artifact 存取。  
+- **差异分析**：`src/ark/holdings/diff.py` 将当前快照与基线比对，产出增/减持及新进/退出动作；阈值通过环境变量控制。  
+- **报告产出**：`py_scripts/ark_holdings/daily_pipeline.py` 构建 Markdown 和 JSON，邮件正文按权重绝对变化排序，同时附带最新持仓 Top N 表。  
+- **Artifacts 管理**：基线仅保存在 GitHub Artifact，不写入主分支；上传前先清除旧版本，避免历史堆积。  
+- **邮件回退**：若 TOML 文件缺失，管道会自动读取 `EMAIL_RECIPIENTS_*` 变量；空字符串会被忽略，防止 Pydantic 校验失败。
+- **CI 调度脚本**：`scripts/run_ark_pipeline.py` 统一处理 GitHub Actions `vars`/`secrets`，减少 YAML 中的复杂 Bash，亦可本地复用。
 
 ## Notes
 

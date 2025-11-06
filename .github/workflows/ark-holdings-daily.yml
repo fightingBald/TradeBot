@@ -12,6 +12,26 @@ permissions:
 jobs:
   ark-holdings:
     runs-on: ubuntu-latest
+    env:
+      BASELINE_ARTIFACT_NAME: ${{ vars.BASELINE_ARTIFACT_NAME }}
+      BASELINE_DIR: ${{ vars.BASELINE_DIR }}
+      OUTPUT_DIR: ${{ vars.OUTPUT_DIR }}
+      RETENTION_DAYS: ${{ vars.RETENTION_DAYS }}
+      EMAIL_ENABLED: ${{ vars.EMAIL_ENABLED }}
+      EMAIL_HOST: ${{ vars.EMAIL_HOST }}
+      EMAIL_PORT: ${{ vars.EMAIL_PORT }}
+      EMAIL_SENDER: ${{ vars.EMAIL_SENDER }}
+      EMAIL_USE_TLS: ${{ vars.EMAIL_USE_TLS }}
+      EMAIL_USE_SSL: ${{ vars.EMAIL_USE_SSL }}
+      EMAIL_MAX_RETRIES: ${{ vars.EMAIL_MAX_RETRIES }}
+      EMAIL_RECIPIENTS_TO: ${{ vars.EMAIL_RECIPIENTS_TO }}
+      EMAIL_RECIPIENTS_CC: ${{ vars.EMAIL_RECIPIENTS_CC }}
+      EMAIL_RECIPIENTS_BCC: ${{ vars.EMAIL_RECIPIENTS_BCC }}
+      FUND_LIST: ${{ vars.FUND_LIST }}
+      MIN_SHARE_DELTA: ${{ vars.MIN_SHARE_DELTA }}
+      MIN_WEIGHT_BP: ${{ vars.MIN_WEIGHT_BP }}
+      HOLDINGS_LIMIT: ${{ vars.HOLDINGS_LIMIT }}
+      TIMEZONE: ${{ vars.TIMEZONE }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -46,88 +66,25 @@ jobs:
 
       - name: Run daily pipeline
         env:
-          EMAIL_ENABLED: ${{ vars.EMAIL_ENABLED }}
-          EMAIL_HOST: ${{ vars.EMAIL_HOST }}
-          EMAIL_PORT: ${{ vars.EMAIL_PORT }}
-          EMAIL_SENDER: ${{ vars.EMAIL_SENDER }}
-          EMAIL_USE_TLS: ${{ vars.EMAIL_USE_TLS }}
-          EMAIL_USE_SSL: ${{ vars.EMAIL_USE_SSL }}
-          EMAIL_MAX_RETRIES: ${{ vars.EMAIL_MAX_RETRIES }}
           EMAIL_USERNAME: ${{ secrets.EMAIL_USERNAME }}
           EMAIL_PASSWORD: ${{ secrets.EMAIL_PASSWORD }}
-          FUND_LIST: ${{ vars.FUND_LIST }}
-          BASELINE_ARTIFACT_NAME: ${{ vars.BASELINE_ARTIFACT_NAME }}
-          BASELINE_DIR: ${{ vars.BASELINE_DIR }}
-          OUTPUT_DIR: ${{ vars.OUTPUT_DIR }}
-          RETENTION_DAYS: ${{ vars.RETENTION_DAYS }}
-          MIN_SHARE_DELTA: ${{ vars.MIN_SHARE_DELTA }}
-          MIN_WEIGHT_BP: ${{ vars.MIN_WEIGHT_BP }}
-          TIMEZONE: ${{ vars.TIMEZONE }}
-          EMAIL_RECIPIENTS_TO: ${{ vars.EMAIL_RECIPIENTS_TO }}
-          EMAIL_RECIPIENTS_CC: ${{ vars.EMAIL_RECIPIENTS_CC }}
-          EMAIL_RECIPIENTS_BCC: ${{ vars.EMAIL_RECIPIENTS_BCC }}
-          PYTHONPATH: ${{ github.workspace }}
         run: |
-          set -euo pipefail
-
-          BASELINE_NAME="${BASELINE_ARTIFACT_NAME:-ark-holdings-baseline}"
-          BASELINE_DIRECTORY="${BASELINE_DIR:-baseline}"
-          BASELINE_PATH="baseline/${BASELINE_NAME}/${BASELINE_DIRECTORY}"
-
-          FUND_LIST_CLEAN="$(echo "${FUND_LIST:-}" | tr -d '[:space:]')"
-          WEIGHT_THRESHOLD="$(python -c "import os; v=os.environ.get('MIN_WEIGHT_BP','').strip(); bp=int(v) if v.isdigit() else 1; print(bp/10000)")"
-
-          SHARE_THRESHOLD="${MIN_SHARE_DELTA:-1}"
-
-          SEND_EMAIL=false
-          if [ -n "${EMAIL_ENABLED:-}" ]; then
-            case "${EMAIL_ENABLED,,}" in
-              true|yes|1) SEND_EMAIL=true ;;
-            esac
-          fi
-
-          OUTPUT_DIR_PATH="${OUTPUT_DIR:-temp/ark_pipeline/latest_snapshots}"
-
-          ARGS=(
-            --baseline-dir "$BASELINE_PATH"
-            --output-dir "$OUTPUT_DIR_PATH"
-            --summary-path temp/ark_pipeline/diff_summary.md
-            --summary-json temp/ark_pipeline/diff_summary.json
-            --recipient-config config/notification_recipients.toml
-            --holdings-limit 25
-            --weight-threshold "$WEIGHT_THRESHOLD"
-            --share-threshold "$SHARE_THRESHOLD"
-          )
-
-          if [ -n "$FUND_LIST_CLEAN" ]; then
-            ARGS+=(--etfs "$FUND_LIST_CLEAN")
-          fi
-
-          if "$SEND_EMAIL"; then
-            ARGS+=(--send-email)
-          fi
-
-          python py_scripts/ark_holdings/daily_pipeline.py "${ARGS[@]}"
+          python scripts/run_ark_pipeline.py
 
       - name: Publish summary to job log
         run: |
           cat temp/ark_pipeline/diff_summary.md >> "$GITHUB_STEP_SUMMARY"
 
       - name: Prepare artifact payload
-        env:
-          OUTPUT_DIR: ${{ vars.OUTPUT_DIR }}
         run: |
           set -euo pipefail
-          OUTPUT_DIR_PATH="${OUTPUT_DIR:-temp/ark_pipeline/latest_snapshots}"
           mkdir -p artifact
-          cp -R "$OUTPUT_DIR_PATH" artifact/baseline
+          cp -R "${OUTPUT_DIR:-temp/ark_pipeline/latest_snapshots}" artifact/baseline
           cp temp/ark_pipeline/diff_summary.md artifact/
           cp temp/ark_pipeline/diff_summary.json artifact/
 
       - name: Delete previous baseline artifacts
         uses: actions/github-script@v7
-        env:
-          BASELINE_ARTIFACT_NAME: ${{ vars.BASELINE_ARTIFACT_NAME }}
         with:
           script: |
             const {data} = await github.rest.actions.listArtifactsForRepo({
