@@ -8,10 +8,11 @@ environment handling logic.
 
 from __future__ import annotations
 
+import logging
 import os
+import shutil
 import sys
 from pathlib import Path
-import shutil
 
 
 def _get_env(name: str, default: str | None = None) -> str:
@@ -55,6 +56,12 @@ def run() -> None:
 
     from py_scripts.ark_holdings.daily_pipeline import main as pipeline_main  # noqa: WPS433
 
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s %(levelname)s [run_ark_pipeline] %(message)s",
+    )
+    logger = logging.getLogger("run_ark_pipeline")
+
     baseline_artifact = _get_env("BASELINE_ARTIFACT_NAME", "ark-holdings-baseline")
     baseline_dir_name = _get_env("BASELINE_DIR", "baseline")
     output_dir = _get_env("OUTPUT_DIR", "temp/ark_pipeline/latest_snapshots")
@@ -65,6 +72,7 @@ def run() -> None:
     send_email = _parse_bool(_get_env("EMAIL_ENABLED", "true"), default=True)
 
     baseline_path = _resolve_baseline_path(baseline_dir_name, baseline_artifact)
+    logger.info("Using baseline directory: %s", baseline_path)
     summary_path = Path("temp/ark_pipeline/diff_summary.md")
     summary_json_path = Path("temp/ark_pipeline/diff_summary.json")
 
@@ -94,13 +102,20 @@ def run() -> None:
     if send_email:
         args.append("--send-email")
 
+    logger.info(
+        "Running daily pipeline for ETFs: %s (send_email=%s)",
+        fund_list or "ALL",
+        send_email,
+    )
     sys.argv = args
     pipeline_main()
+    logger.info("Pipeline completed: summary=%s", summary_json_path)
 
     # 清理旧的基线目录，避免在下一次运行时混淆
     baseline_root = Path("baseline")
     if baseline_root.exists():
         shutil.rmtree(baseline_root, ignore_errors=True)
+        logger.info("Removed downloaded baseline directory: %s", baseline_root)
 
 
 def _resolve_baseline_path(baseline_dir_name: str, baseline_artifact: str) -> Path:
