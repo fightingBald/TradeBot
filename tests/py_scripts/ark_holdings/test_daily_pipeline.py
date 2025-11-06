@@ -7,6 +7,7 @@ import pytest
 
 from src.ark.holdings import Holding, HoldingSnapshot, diff_snapshots
 from py_scripts.ark_holdings.daily_pipeline import (_build_etf_report,
+                                                    _build_global_summary,
                                                     _render_email_html,
                                                     _resolve_recipients,
                                                     _sanitize_email_environment,
@@ -82,8 +83,9 @@ def test_render_email_html_orders_sections(baseline_snapshot, current_snapshot):
     report = _build_etf_report(
         "ARKK", baseline_snapshot, current_snapshot, changes, top_n=5
     )
+    summary = _build_global_summary([report], top_n=5)
     html_body = _render_email_html(
-        [report], {"ARKK": current_snapshot}, holdings_limit=10
+        [report], {"ARKK": current_snapshot}, holdings_limit=10, global_summary=summary
     )
 
     # Expect key elements present

@@ -141,7 +141,9 @@ def main() -> None:
         report = _build_etf_report(symbol, baseline, snapshot, changes, args.top)
         reports.append(report)
 
-    markdown = _render_markdown(reports)
+    global_summary = _build_global_summary(reports, args.top)
+
+    markdown = _render_markdown(reports, global_summary)
     summary_path = Path(args.summary_path)
     summary_path.parent.mkdir(parents=True, exist_ok=True)
     summary_path.write_text(markdown, encoding="utf-8")
@@ -150,7 +152,12 @@ def main() -> None:
     summary_json_path = Path(args.summary_json)
     summary_json_path.parent.mkdir(parents=True, exist_ok=True)
     summary_json_path.write_text(
-        json.dumps({"etfs": reports}, ensure_ascii=False, indent=2, default=_json_default),
+        json.dumps(
+            {"summary": global_summary, "etfs": reports},
+            ensure_ascii=False,
+            indent=2,
+            default=_json_default,
+        ),
         encoding="utf-8",
     )
     logger.info("Wrote summary json: %s", summary_json_path)
@@ -167,6 +174,7 @@ def main() -> None:
             summary_markdown=summary_path,
             summary_json=summary_json_path,
             holdings_limit=args.holdings_limit,
+            global_summary=global_summary,
         )
 
 
@@ -227,6 +235,7 @@ def change_to_dict(change: HoldingChange) -> Dict[str, object]:
     weight_change = change.weight_change or 0.0
     shares_change = change.shares_change or 0.0
     return {
+        "etf": change.etf,
         "action": change.action,
         "ticker": change.ticker,
         "company": change.company,
@@ -235,16 +244,51 @@ def change_to_dict(change: HoldingChange) -> Dict[str, object]:
         "weight_change_abs": abs(weight_change),
         "shares_change_abs": abs(shares_change),
         "market_value_change": change.market_value_change,
+        "is_new": change.action == "new",
+        "is_exit": change.action == "exit",
         "previous": change.previous.model_dump() if change.previous else None,
         "current": change.current.model_dump() if change.current else None,
     }
 
 
-def _render_markdown(reports: Iterable[dict]) -> str:
+def _build_global_summary(reports: Sequence[dict], top_n: int) -> dict:
+    buys: List[dict] = []
+    sells: List[dict] = []
+
+    for report in reports:
+        for change in report["changes"]:
+            ticker = change.get("ticker") or ""
+            weight = change.get("weight_change")
+            if not ticker or weight is None:
+                continue
+            shares = change.get("shares_change")
+            if abs(weight) < 1e-9 and abs(shares or 0.0) < 1.0:
+                continue
+            entry = dict(change)
+            entry["etf"] = change.get("etf") or report["etf"]
+            if change["action"] in {"new", "buy"}:
+                buys.append(entry)
+            elif change["action"] in {"exit", "sell"}:
+                sells.append(entry)
+
+    key = lambda ch: abs(ch.get("weight_change") or 0.0)
+    buys.sort(key=key, reverse=True)
+    sells.sort(key=key, reverse=True)
+
+    if top_n > 0:
+        buys = buys[:top_n]
+        sells = sells[:top_n]
+
+    return {"buys": buys, "sells": sells}
+
+
+def _render_markdown(reports: Iterable[dict], global_summary: dict) -> str:
     lines = [
         "# ARK Holdings Daily Diff",
         "",
     ]
+    lines.extend(_render_markdown_global(global_summary))
+    lines.append("")
     for report in reports:
         lines.extend(_render_report_section(report))
     return "\n".join(lines).strip() + "\n"
@@ -304,6 +348,61 @@ def _format_table(entries: Sequence[dict]) -> List[str]:
     return rows
 
 
+def _render_markdown_global(summary: dict) -> List[str]:
+    lines: List[str] = ["## 全局持仓变化摘要", ""]
+    buys = summary.get("buys", [])
+    sells = summary.get("sells", [])
+
+    if buys:
+        lines.append(f"### 增持 Top {len(buys)}")
+        lines.extend(_format_global_table(buys, include_new=True))
+        lines.append("")
+    else:
+        lines.append("- 增持：无显著变动")
+
+    if sells:
+        lines.append(f"### 减持 Top {len(sells)}")
+        lines.extend(_format_global_table(sells, include_exit=True))
+        lines.append("")
+    else:
+        lines.append("- 减持：无显著变动")
+
+    return lines
+
+
+def _format_global_table(
+    entries: Sequence[dict],
+    *,
+    include_new: bool = False,
+    include_exit: bool = False,
+) -> List[str]:
+    if include_new:
+        header = "| ETF | Ticker | Company | Action | Shares Δ | Weight Δ | MV Δ | 新进? |"
+        separator = "| --- | --- | --- | --- | --- | --- | --- | --- |"
+    elif include_exit:
+        header = "| ETF | Ticker | Company | Action | Shares Δ | Weight Δ | MV Δ | 清仓? |"
+        separator = "| --- | --- | --- | --- | --- | --- | --- | --- |"
+    else:
+        header = "| ETF | Ticker | Company | Action | Shares Δ | Weight Δ | MV Δ |"
+        separator = "| --- | --- | --- | --- | --- | --- | --- |"
+    rows = [header, separator]
+    for entry in entries:
+        shares = entry["shares_change"] or 0.0
+        weight = entry["weight_change"] or 0.0
+        mv = entry["market_value_change"]
+        mv_display = f"${mv:,.0f}" if mv is not None else "N/A"
+        indicator = ""
+        if include_new:
+            indicator = "✅" if entry.get("is_new") else ""
+        elif include_exit:
+            indicator = "✅" if entry.get("is_exit") else ""
+        rows.append(
+            f"| {entry['etf']} | {entry['ticker']} | {entry['company']} | {entry['action']} | "
+            f"{shares:,.0f} | {weight:.4f} | {mv_display} | {indicator} |"
+        )
+    return rows
+
+
 def _json_default(value):
     if hasattr(value, "isoformat"):
         try:
@@ -322,6 +421,7 @@ def _send_email_report(
     summary_markdown: Path,
     summary_json: Path,
     holdings_limit: int,
+    global_summary: dict,
 ) -> None:
     recipients = _resolve_recipients(recipient_config_path)
     if not recipients.to and not recipients.cc and not recipients.bcc:
@@ -336,7 +436,12 @@ def _send_email_report(
         raise
 
     service = EmailNotificationService(settings)
-    body_html = _render_email_html(reports, snapshots, holdings_limit=holdings_limit)
+    body_html = _render_email_html(
+        reports,
+        snapshots,
+        holdings_limit=holdings_limit,
+        global_summary=global_summary,
+    )
 
     attachments: List[EmailAttachment] = []
     if summary_markdown.exists():
@@ -377,11 +482,13 @@ def _render_email_html(
     snapshots: Dict[str, HoldingSnapshot],
     *,
     holdings_limit: int,
+    global_summary: dict,
 ) -> str:
     lines: List[str] = [
         "<html><body>",
         "<h1>ARK Holdings Daily Diff</h1>",
     ]
+    lines.extend(_render_email_global(global_summary))
     for report in reports:
         etf = html.escape(report["etf"])
         lines.append(f"<h2>{etf}</h2>")
@@ -462,6 +569,68 @@ def _render_email_html(
         lines.append("<hr/>")
     lines.append("</body></html>")
     return "\n".join(lines)
+
+
+def _render_email_global(summary: dict) -> List[str]:
+    lines: List[str] = ["<h2>全局持仓变化摘要</h2>"]
+    buys = summary.get("buys", [])
+    sells = summary.get("sells", [])
+
+    if buys:
+        lines.append("<h3>增持 Top {}</h3>".format(len(buys)))
+        lines.append(_format_global_html_table(buys, include_new=True))
+    else:
+        lines.append("<p>增持：无显著变动。</p>")
+
+    if sells:
+        lines.append("<h3>减持 Top {}</h3>".format(len(sells)))
+        lines.append(_format_global_html_table(sells, include_exit=True))
+    else:
+        lines.append("<p>减持：无显著变动。</p>")
+
+    lines.append("<hr/>")
+    return lines
+
+
+def _format_global_html_table(
+    entries: Sequence[dict],
+    *,
+    include_new: bool = False,
+    include_exit: bool = False,
+) -> str:
+    header_extra = "新进?" if include_new else "清仓?" if include_exit else ""
+    rows = [
+        "<table border='1' cellpadding='4' cellspacing='0'>",
+        "<thead><tr>"
+        "<th>ETF</th><th>Ticker</th><th>Company</th><th>Action</th>"
+        "<th>Shares Δ</th><th>Weight Δ</th><th>MV Δ</th>"
+        f"<th>{header_extra}</th>"
+        "</tr></thead><tbody>",
+    ]
+    for entry in entries:
+        shares = entry["shares_change"] or 0.0
+        weight = entry["weight_change"] or 0.0
+        mv = entry["market_value_change"]
+        mv_display = f"${mv:,.0f}" if mv is not None else "N/A"
+        indicator = ""
+        if include_new:
+            indicator = "✅" if entry.get("is_new") else ""
+        elif include_exit:
+            indicator = "✅" if entry.get("is_exit") else ""
+        rows.append(
+            "<tr>"
+            f"<td>{html.escape(entry['etf'])}</td>"
+            f"<td>{html.escape(entry['ticker'])}</td>"
+            f"<td>{html.escape(entry['company'])}</td>"
+            f"<td>{html.escape(entry['action'])}</td>"
+            f"<td>{shares:,.0f}</td>"
+            f"<td>{weight:.4f}</td>"
+            f"<td>{mv_display}</td>"
+            f"<td>{indicator}</td>"
+            "</tr>"
+        )
+    rows.append("</tbody></table>")
+    return "\n".join(rows)
 
 
 def _resolve_recipients(recipient_config_path: str) -> RecipientConfig:
