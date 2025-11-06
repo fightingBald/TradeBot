@@ -110,6 +110,7 @@ Once running, the API provides:
   - `EMAIL_SENDER`=`example@gmail.com`
   - （可选）`EMAIL_USE_TLS`=`true`、`EMAIL_USE_SSL`=`false`、`EMAIL_MAX_RETRIES`=`3`
 - 邮件收件人通过 `config/notification_recipients.toml` 管理，支持 To/Cc/Bcc；需要停用某个地址时直接注释掉即可。
+- CI 环境中如无法访问该 TOML，可通过仓库变量 `EMAIL_RECIPIENTS_TO` / `EMAIL_RECIPIENTS_CC` / `EMAIL_RECIPIENTS_BCC` 设置逗号分隔的邮件列表，脚本会自动回退到这些环境变量。
 
 ## Notes
 

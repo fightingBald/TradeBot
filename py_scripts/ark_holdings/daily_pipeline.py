@@ -6,6 +6,7 @@ import argparse
 import html
 import json
 import logging
+import os
 import shutil
 from pathlib import Path
 from typing import Dict, Iterable, List, Sequence
@@ -17,7 +18,7 @@ from data_sources.ark_holdings.io import (load_snapshot_folder,
                                           snapshot_collection_to_folder)
 from notification_svc import (EmailAttachment, EmailDeliveryError,
                               EmailNotificationService, EmailSettings,
-                              load_recipient_config)
+                              RecipientConfig, load_recipient_config)
 
 logger = logging.getLogger("ark_pipeline")
 
@@ -312,7 +313,7 @@ def _send_email_report(
     summary_json: Path,
     holdings_limit: int,
 ) -> None:
-    recipients = load_recipient_config(recipient_config_path)
+    recipients = _resolve_recipients(recipient_config_path)
     if not recipients.to and not recipients.cc and not recipients.bcc:
         logger.warning("收件人列表为空，跳过发送邮件。")
         return
@@ -450,6 +451,42 @@ def _render_email_html(
         lines.append("<hr/>")
     lines.append("</body></html>")
     return "\n".join(lines)
+
+
+def _resolve_recipients(recipient_config_path: str) -> RecipientConfig:
+    """Load recipient configuration from file or EMAIL_RECIPIENTS_* environment variables."""
+    env_to = os.environ.get("EMAIL_RECIPIENTS_TO", "")
+    env_cc = os.environ.get("EMAIL_RECIPIENTS_CC", "")
+    env_bcc = os.environ.get("EMAIL_RECIPIENTS_BCC", "")
+
+    try:
+        return load_recipient_config(recipient_config_path)
+    except FileNotFoundError:
+        logger.info(
+            "Recipient config file missing at %s, fallback to EMAIL_RECIPIENTS_* env variables.",
+            recipient_config_path,
+        )
+    except ValueError:
+        raise
+
+    if not any([env_to.strip(), env_cc.strip(), env_bcc.strip()]):
+        raise FileNotFoundError(
+            f"找不到收件人配置文件：{recipient_config_path}，且未设置 EMAIL_RECIPIENTS_* 环境变量"
+        )
+
+    return RecipientConfig.model_validate(
+        {
+            "to": _split_addresses(env_to),
+            "cc": _split_addresses(env_cc),
+            "bcc": _split_addresses(env_bcc),
+        }
+    )
+
+
+def _split_addresses(raw: str) -> List[str]:
+    if not raw:
+        return []
+    return [addr.strip() for addr in raw.split(",") if addr.strip()]
 
 
 if __name__ == "__main__":

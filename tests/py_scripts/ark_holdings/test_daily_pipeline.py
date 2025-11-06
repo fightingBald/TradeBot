@@ -7,6 +7,7 @@ import pytest
 from data_sources.ark_holdings import Holding, HoldingSnapshot, diff_snapshots
 from py_scripts.ark_holdings.daily_pipeline import (_build_etf_report,
                                                     _render_email_html,
+                                                    _resolve_recipients,
                                                     change_to_dict)
 
 
@@ -93,3 +94,19 @@ def test_render_email_html_orders_sections(baseline_snapshot, current_snapshot):
     assert tsla_index >= 0
     # Since ROKU exited, ZM should appear later in holdings section
     assert "ZM" in html_body
+
+
+def test_resolve_recipients_env_fallback(monkeypatch, tmp_path):
+    missing_path = tmp_path / "missing.toml"
+    monkeypatch.delenv("EMAIL_RECIPIENTS_TO", raising=False)
+    monkeypatch.delenv("EMAIL_RECIPIENTS_CC", raising=False)
+    monkeypatch.delenv("EMAIL_RECIPIENTS_BCC", raising=False)
+
+    monkeypatch.setenv("EMAIL_RECIPIENTS_TO", "foo@example.com,bar@example.com")
+    monkeypatch.setenv("EMAIL_RECIPIENTS_CC", "")
+    monkeypatch.setenv("EMAIL_RECIPIENTS_BCC", "bcc@example.com")
+
+    recipients = _resolve_recipients(str(missing_path))
+    assert recipients.to == ["foo@example.com", "bar@example.com"]
+    assert recipients.cc == []
+    assert recipients.bcc == ["bcc@example.com"]

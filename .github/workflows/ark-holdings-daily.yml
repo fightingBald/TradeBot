@@ -63,6 +63,9 @@ jobs:
           MIN_SHARE_DELTA: ${{ vars.MIN_SHARE_DELTA }}
           MIN_WEIGHT_BP: ${{ vars.MIN_WEIGHT_BP }}
           TIMEZONE: ${{ vars.TIMEZONE }}
+          EMAIL_RECIPIENTS_TO: ${{ vars.EMAIL_RECIPIENTS_TO }}
+          EMAIL_RECIPIENTS_CC: ${{ vars.EMAIL_RECIPIENTS_CC }}
+          EMAIL_RECIPIENTS_BCC: ${{ vars.EMAIL_RECIPIENTS_BCC }}
           PYTHONPATH: ${{ github.workspace }}
         run: |
           set -euo pipefail
