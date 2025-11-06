@@ -1,13 +1,12 @@
 from datetime import date, datetime
-
 from zoneinfo import ZoneInfo
 
+import data_sources.earnings_to_calendar.calendars as calendars_mod
+import data_sources.earnings_to_calendar.runner as runner_mod
+from data_sources.earnings_to_calendar import providers as providers_mod
 from data_sources.earnings_to_calendar.domain import EarningsEvent
 from data_sources.earnings_to_calendar.runner import run
-import data_sources.earnings_to_calendar.runner as runner_mod
 from data_sources.earnings_to_calendar.settings import RuntimeOptions
-from data_sources.earnings_to_calendar import providers as providers_mod
-import data_sources.earnings_to_calendar.calendars as calendars_mod
 
 
 class _StubProvider:

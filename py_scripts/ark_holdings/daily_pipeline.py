@@ -10,24 +10,14 @@ import shutil
 from pathlib import Path
 from typing import Dict, Iterable, List, Sequence
 
-from data_sources.ark_holdings import (
-    FUND_CSV,
-    HoldingSnapshot,
-    diff_snapshots,
-    fetch_holdings_snapshot,
-)
+from data_sources.ark_holdings import (FUND_CSV, HoldingSnapshot,
+                                       diff_snapshots, fetch_holdings_snapshot)
 from data_sources.ark_holdings.diff import HoldingChange
-from data_sources.ark_holdings.io import (
-    load_snapshot_folder,
-    snapshot_collection_to_folder,
-)
-from notification_svc import (
-    EmailAttachment,
-    EmailDeliveryError,
-    EmailNotificationService,
-    EmailSettings,
-    load_recipient_config,
-)
+from data_sources.ark_holdings.io import (load_snapshot_folder,
+                                          snapshot_collection_to_folder)
+from notification_svc import (EmailAttachment, EmailDeliveryError,
+                              EmailNotificationService, EmailSettings,
+                              load_recipient_config)
 
 logger = logging.getLogger("ark_pipeline")
 

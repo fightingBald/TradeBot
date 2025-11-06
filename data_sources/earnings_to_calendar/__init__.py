@@ -2,23 +2,15 @@
 
 from .calendars import build_ics, google_insert, icloud_caldav_insert
 from .cli import main
-from .defaults import DEFAULT_LOOKAHEAD_DAYS, DEFAULT_TIMEOUT_SECONDS, USER_AGENT
+from .defaults import (DEFAULT_LOOKAHEAD_DAYS, DEFAULT_TIMEOUT_SECONDS,
+                       USER_AGENT)
 from .domain import EarningsEvent, deduplicate_events, parse_iso_date
-from .providers import (
-    EarningsDataProvider,
-    FinnhubEarningsProvider,
-    FmpEarningsProvider,
-    PROVIDERS,
-)
 from .macro_events import fetch_macro_events
+from .providers import (PROVIDERS, EarningsDataProvider,
+                        FinnhubEarningsProvider, FmpEarningsProvider)
 from .runner import RunSummary, apply_outputs, collect_events, run
-from .settings import (
-    RuntimeOptions,
-    build_runtime_options,
-    load_config,
-    load_env_file,
-    parse_symbols,
-)
+from .settings import (RuntimeOptions, build_runtime_options, load_config,
+                       load_env_file, parse_symbols)
 
 _parse_symbols = parse_symbols  # backward compatibility
 

@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from datetime import date, datetime, time, timedelta
 from typing import Iterable, List
-
 from zoneinfo import ZoneInfo
 
 from .domain import EarningsEvent

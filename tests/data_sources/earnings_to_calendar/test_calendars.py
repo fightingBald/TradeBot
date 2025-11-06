@@ -1,5 +1,4 @@
 from datetime import date, datetime
-
 from zoneinfo import ZoneInfo
 
 import data_sources.earnings_to_calendar.calendars as calendars_mod

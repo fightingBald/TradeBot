@@ -1,8 +1,8 @@
 from datetime import date, datetime
-
 from zoneinfo import ZoneInfo
 
-from data_sources.earnings_to_calendar.market_events import generate_market_events
+from data_sources.earnings_to_calendar.market_events import \
+    generate_market_events
 from data_sources.earnings_to_calendar.settings import RuntimeOptions
 
 

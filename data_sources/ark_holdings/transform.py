@@ -8,7 +8,6 @@ from typing import Tuple
 
 import pandas as pd
 
-
 COLUMN_MAP = {
     "market_value_($)": "market_value",
     "market_value ($)": "market_value",

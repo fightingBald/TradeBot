@@ -1,6 +1,7 @@
 from datetime import date
 
-from data_sources.earnings_to_calendar.domain import EarningsEvent, deduplicate_events
+from data_sources.earnings_to_calendar.domain import (EarningsEvent,
+                                                      deduplicate_events)
 
 
 def test_deduplicate_events_preserves_first_occurrence():

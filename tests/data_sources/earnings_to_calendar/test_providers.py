@@ -1,16 +1,11 @@
 from datetime import date, datetime, timedelta
-
 from zoneinfo import ZoneInfo
 
 from data_sources.earnings_to_calendar.defaults import (
-    DEFAULT_EVENT_DURATION_MINUTES,
-    DEFAULT_SESSION_TIMES,
-    DEFAULT_SOURCE_TIMEZONE,
-)
+    DEFAULT_EVENT_DURATION_MINUTES, DEFAULT_SESSION_TIMES,
+    DEFAULT_SOURCE_TIMEZONE)
 from data_sources.earnings_to_calendar.providers import (
-    FinnhubEarningsProvider,
-    FmpEarningsProvider,
-)
+    FinnhubEarningsProvider, FmpEarningsProvider)
 
 from .conftest import StubResponse
 

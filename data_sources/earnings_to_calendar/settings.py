@@ -5,19 +5,14 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import tomllib
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Mapping
 
-import tomllib
-
-from .defaults import (
-    DEFAULT_EVENT_DURATION_MINUTES,
-    DEFAULT_LOOKAHEAD_DAYS,
-    DEFAULT_SESSION_TIMES,
-    DEFAULT_SOURCE_TIMEZONE,
-    DEFAULT_TARGET_TIMEZONE,
-)
+from .defaults import (DEFAULT_EVENT_DURATION_MINUTES, DEFAULT_LOOKAHEAD_DAYS,
+                       DEFAULT_SESSION_TIMES, DEFAULT_SOURCE_TIMEZONE,
+                       DEFAULT_TARGET_TIMEZONE)
 from .logging_utils import get_logger
 
 logger = get_logger()

@@ -7,23 +7,17 @@ import sys
 from dataclasses import dataclass
 from datetime import date, datetime, time, timedelta
 from typing import List, Sequence
-
 from zoneinfo import ZoneInfo
 
 from .calendars import build_ics, google_insert, icloud_caldav_insert
 from .domain import EarningsEvent, deduplicate_events
 from .logging_utils import get_logger
-from .market_events import generate_market_events
 from .macro_events import fetch_macro_events
+from .market_events import generate_market_events
 from .providers import PROVIDERS, EarningsDataProvider
 from .settings import RuntimeOptions
-from .sync_state import (
-    build_sync_state,
-    diff_events,
-    load_sync_state,
-    save_sync_state,
-    SyncDiff,
-)
+from .sync_state import (SyncDiff, build_sync_state, diff_events,
+                         load_sync_state, save_sync_state)
 
 logger = get_logger()
 

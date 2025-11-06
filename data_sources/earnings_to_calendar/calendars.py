@@ -102,10 +102,10 @@ def _get_google_service(creds_path: str, token_path: str):
     需要先在 https://developers.google.com/workspace/calendar/api/quickstart/python 按 Quickstart 下载 OAuth credentials.json
     首次运行会打开浏览器授权，令牌保存在 token.json
     """
-    from googleapiclient.discovery import build
+    from google.auth.transport.requests import Request
     from google.oauth2.credentials import Credentials
     from google_auth_oauthlib.flow import InstalledAppFlow
-    from google.auth.transport.requests import Request
+    from googleapiclient.discovery import build
 
     scopes = ["https://www.googleapis.com/auth/calendar"]
     creds = None

@@ -7,15 +7,12 @@ import re
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from typing import Iterable, List, Sequence
-
-import requests
 from zoneinfo import ZoneInfo
 
-from .defaults import (
-    DEFAULT_EVENT_DURATION_MINUTES,
-    DEFAULT_TIMEOUT_SECONDS,
-    USER_AGENT,
-)
+import requests
+
+from .defaults import (DEFAULT_EVENT_DURATION_MINUTES, DEFAULT_TIMEOUT_SECONDS,
+                       USER_AGENT)
 from .domain import EarningsEvent
 from .logging_utils import get_logger
 from .settings import RuntimeOptions

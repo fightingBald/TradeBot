@@ -4,20 +4,16 @@ from __future__ import annotations
 
 from datetime import date, datetime, time, timedelta
 from typing import Callable, Dict, List, Sequence
+from zoneinfo import ZoneInfo
 
 import httpx
 import numpy as np
 import pandas as pd
-from zoneinfo import ZoneInfo
 
-from .defaults import (
-    DEFAULT_EVENT_DURATION_MINUTES,
-    DEFAULT_SESSION_TIMES,
-    DEFAULT_TIMEOUT_SECONDS,
-    USER_AGENT,
-)
-from .logging_utils import get_logger
+from .defaults import (DEFAULT_EVENT_DURATION_MINUTES, DEFAULT_SESSION_TIMES,
+                       DEFAULT_TIMEOUT_SECONDS, USER_AGENT)
 from .domain import EarningsEvent
+from .logging_utils import get_logger
 
 logger = get_logger()
 
