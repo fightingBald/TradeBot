@@ -283,7 +283,7 @@ node_modules/
 coverage/
 
 # Cache & data
-data/
+
 data/**/*
 !data/.gitkeep
 
