@@ -303,3 +303,4 @@ crash.log
 override.tf
 terraform.tfvars
 terraform.tfvars.json
+/actions.vars
