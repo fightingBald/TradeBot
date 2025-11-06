@@ -17,9 +17,15 @@ class EarningsEvent(BaseModel):
     source: str = Field("", description="Data provider name")
     url: str | None = None
     notes: str | None = None
-    start_at: datetime | None = Field(default=None, description="Event start time (timezone-aware)")
-    end_at: datetime | None = Field(default=None, description="Event end time (timezone-aware)")
-    timezone: str | None = Field(default=None, description="Original timezone identifier")
+    start_at: datetime | None = Field(
+        default=None, description="Event start time (timezone-aware)"
+    )
+    end_at: datetime | None = Field(
+        default=None, description="Event end time (timezone-aware)"
+    )
+    timezone: str | None = Field(
+        default=None, description="Original timezone identifier"
+    )
 
     @field_validator("symbol", mode="before")
     @classmethod

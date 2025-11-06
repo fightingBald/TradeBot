@@ -4,19 +4,13 @@ from pathlib import Path
 from types import SimpleNamespace
 
 from data_sources.earnings_to_calendar.defaults import (
-    DEFAULT_EVENT_DURATION_MINUTES,
-    DEFAULT_LOOKAHEAD_DAYS,
-    DEFAULT_SESSION_TIMES,
-    DEFAULT_SOURCE_TIMEZONE,
-    DEFAULT_TARGET_TIMEZONE,
-)
-from data_sources.earnings_to_calendar.settings import (
-    RuntimeOptions,
-    build_runtime_options,
-    load_config,
-    load_env_file,
-    parse_symbols,
-)
+    DEFAULT_EVENT_DURATION_MINUTES, DEFAULT_LOOKAHEAD_DAYS,
+    DEFAULT_SESSION_TIMES, DEFAULT_SOURCE_TIMEZONE, DEFAULT_TARGET_TIMEZONE)
+from data_sources.earnings_to_calendar.settings import (RuntimeOptions,
+                                                        build_runtime_options,
+                                                        load_config,
+                                                        load_env_file,
+                                                        parse_symbols)
 
 
 def test_parse_symbols_normalizes_and_deduplicates():
@@ -27,7 +21,9 @@ def test_parse_symbols_normalizes_and_deduplicates():
 
 def test_load_env_file_populates_environment(tmp_path, monkeypatch):
     env_file = tmp_path / ".env"
-    env_file.write_text("NEW_VAR=value\nEXISTING=should_not_override\n", encoding="utf-8")
+    env_file.write_text(
+        "NEW_VAR=value\nEXISTING=should_not_override\n", encoding="utf-8"
+    )
     monkeypatch.setenv("EXISTING", "keep")
     monkeypatch.delenv("NEW_VAR", raising=False)
 

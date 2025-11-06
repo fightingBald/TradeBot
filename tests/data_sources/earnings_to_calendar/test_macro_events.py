@@ -75,7 +75,9 @@ def test_fetch_macro_events_filters_known_events(monkeypatch):
         captured["timeout"] = timeout
         return _Response(payload)
 
-    monkeypatch.setattr("data_sources.earnings_to_calendar.macro_events.requests.get", fake_get)
+    monkeypatch.setattr(
+        "data_sources.earnings_to_calendar.macro_events.requests.get", fake_get
+    )
 
     options = _base_options()
     events = fetch_macro_events(date(2024, 9, 1), date(2024, 9, 30), options)

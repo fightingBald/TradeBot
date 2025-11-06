@@ -7,17 +7,17 @@ import sys
 from dataclasses import dataclass
 from datetime import date, datetime, time, timedelta
 from typing import List, Sequence
-
 from zoneinfo import ZoneInfo
 
 from .calendars import build_ics, google_insert, icloud_caldav_insert
 from .domain import EarningsEvent, deduplicate_events
 from .logging_utils import get_logger
-from .market_events import generate_market_events
 from .macro_events import fetch_macro_events
+from .market_events import generate_market_events
 from .providers import PROVIDERS, EarningsDataProvider
 from .settings import RuntimeOptions
-from .sync_state import build_sync_state, diff_events, load_sync_state, save_sync_state, SyncDiff
+from .sync_state import (SyncDiff, build_sync_state, diff_events,
+                         load_sync_state, save_sync_state)
 
 logger = get_logger()
 
@@ -85,7 +85,9 @@ def collect_events(
     return unique_events
 
 
-def _format_google_event_lines(events: Sequence[EarningsEvent], options: RuntimeOptions) -> str:
+def _format_google_event_lines(
+    events: Sequence[EarningsEvent], options: RuntimeOptions
+) -> str:
     fallback_tz = ZoneInfo(options.target_timezone)
 
     def _event_sort_key(item: EarningsEvent) -> tuple[date, datetime, str]:
@@ -126,7 +128,10 @@ def apply_outputs(
     )
 
     if not events:
-        print("没拉到任何财报日。检查 API Key、代码是否美股、日期范围或数据源限额。", file=sys.stderr)
+        print(
+            "没拉到任何财报日。检查 API Key、代码是否美股、日期范围或数据源限额。",
+            file=sys.stderr,
+        )
 
     if options.export_ics:
         logger.info("导出 ICS 文件：%s", options.export_ics)
@@ -169,7 +174,11 @@ def apply_outputs(
             )
         if events_for_google:
             formatted = _format_google_event_lines(events_for_google, options)
-            logger.info("Google Calendar 待写入事件（%d 条）：\n%s", len(events_for_google), formatted)
+            logger.info(
+                "Google Calendar 待写入事件（%d 条）：\n%s",
+                len(events_for_google),
+                formatted,
+            )
             target_calendar_id = google_insert(
                 events_for_google,
                 calendar_id=options.google_calendar_id,
@@ -230,7 +239,9 @@ def run(options: RuntimeOptions, *, today: date | None = None) -> RunSummary:
     )
     if options.incremental_sync and options.sync_state_path:
         fingerprints = sync_diff.fingerprints if sync_diff else {}
-        new_state = build_sync_state(events, fingerprints, since=start_date, until=end_date)
+        new_state = build_sync_state(
+            events, fingerprints, since=start_date, until=end_date
+        )
         save_sync_state(options.sync_state_path, new_state)
         if summary.sync_stats is None and sync_diff is not None:
             summary.sync_stats = {

@@ -90,6 +90,26 @@ Once running, the API provides:
   ```
   （参数在 TOML 中可随时注释/启用，命令行仅覆盖需要临时调整的字段。）
 - `notebooks/fmp_data_check.ipynb` 提供交互式示例，可快速验证本地 `FMP_API_KEY` 是否能成功拉取财报数据。
+- `py_scripts/ark_holdings/daily_pipeline.py` 整合了每日快照抓取、与基线比对、邮件通知以及 Markdown/JSON 摘要输出；配套的 GitHub Actions 工作流 `ARK Holdings Daily` 会在每个交易日收盘后运行该脚本、上传最新基线与摘要到 Artifact，并在上传前清理旧有 Artifact，确保仓库里始终只有一份最新基线。
+
+## Automation
+
+### ARK Holdings Daily Run
+
+- 工作流名称：`ARK Holdings Daily`（`.github/workflows/ark-holdings-daily.yml`），默认在美股交易日的美东时间收盘后触发，也可手动 `workflow_dispatch`。
+- 工作流会自动：
+  - 下载上一份 Artifact 作为“最新基线”；
+  - 拉取当日全量持仓、计算与基线的全部变动并生成 Markdown/JSON 摘要；
+  - 将摘要写入 GitHub Job Summary、上传新的 Artifact，并在上传前删除旧有 `ark-holdings-baseline`；
+  - 若配置了 SMTP 凭据与收件人列表，会发送一封 HTML 邮件（正文含权重变化排序、持仓 Top N，附件包含 `diff_summary.md/json`）。
+- 需在仓库 Secrets 里配置以下键值（示例均为 Gmail）：
+  - `EMAIL_HOST`=`smtp.gmail.com`
+  - `EMAIL_PORT`=`587`
+  - `EMAIL_USERNAME`=`example@gmail.com`
+  - `EMAIL_PASSWORD`=`<应用专用密码>`
+  - `EMAIL_SENDER`=`example@gmail.com`
+  - （可选）`EMAIL_USE_TLS`=`true`、`EMAIL_USE_SSL`=`false`、`EMAIL_MAX_RETRIES`=`3`
+- 邮件收件人通过 `config/notification_recipients.toml` 管理，支持 To/Cc/Bcc；需要停用某个地址时直接注释掉即可。
 
 ## Notes
 

@@ -1,16 +1,11 @@
 from datetime import date, datetime, timedelta
-
 from zoneinfo import ZoneInfo
 
 from data_sources.earnings_to_calendar.defaults import (
-    DEFAULT_EVENT_DURATION_MINUTES,
-    DEFAULT_SESSION_TIMES,
-    DEFAULT_SOURCE_TIMEZONE,
-)
+    DEFAULT_EVENT_DURATION_MINUTES, DEFAULT_SESSION_TIMES,
+    DEFAULT_SOURCE_TIMEZONE)
 from data_sources.earnings_to_calendar.providers import (
-    FinnhubEarningsProvider,
-    FmpEarningsProvider,
-)
+    FinnhubEarningsProvider, FmpEarningsProvider)
 
 from .conftest import StubResponse
 
@@ -49,7 +44,9 @@ def test_fmp_provider_filters_and_normalizes(monkeypatch):
     assert len(events) == 2
     ny = ZoneInfo("America/New_York")
     assert events[0].start_at == datetime(2024, 1, 25, 17, 0, tzinfo=ny)
-    assert events[0].end_at == events[0].start_at + timedelta(minutes=DEFAULT_EVENT_DURATION_MINUTES)
+    assert events[0].end_at == events[0].start_at + timedelta(
+        minutes=DEFAULT_EVENT_DURATION_MINUTES
+    )
     assert events[0].timezone == "America/New_York"
     assert events[1].start_at is None
     assert events[1].end_at is None
@@ -80,4 +77,6 @@ def test_finnhub_provider_handles_nested_payload(monkeypatch):
     assert len(events) == 1
     ny = ZoneInfo("America/New_York")
     assert events[0].start_at == datetime(2024, 1, 25, 8, 0, tzinfo=ny)
-    assert events[0].end_at == events[0].start_at + timedelta(minutes=DEFAULT_EVENT_DURATION_MINUTES)
+    assert events[0].end_at == events[0].start_at + timedelta(
+        minutes=DEFAULT_EVENT_DURATION_MINUTES
+    )

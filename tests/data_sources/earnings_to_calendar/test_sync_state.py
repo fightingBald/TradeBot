@@ -1,14 +1,11 @@
 from datetime import date, datetime
-
 from zoneinfo import ZoneInfo
 
 from data_sources.earnings_to_calendar.domain import EarningsEvent
-from data_sources.earnings_to_calendar.sync_state import (
-    build_sync_state,
-    diff_events,
-    load_sync_state,
-    save_sync_state,
-)
+from data_sources.earnings_to_calendar.sync_state import (build_sync_state,
+                                                          diff_events,
+                                                          load_sync_state,
+                                                          save_sync_state)
 
 
 def _sample_event(symbol: str = "AAPL", *, notes: str | None = None) -> EarningsEvent:
@@ -34,7 +31,9 @@ def test_diff_events_detects_create_update(tmp_path):
     assert not diff.to_update
     assert not diff.unchanged
 
-    state = build_sync_state([event], diff.fingerprints, since=date(2024, 6, 1), until=date(2024, 7, 1))
+    state = build_sync_state(
+        [event], diff.fingerprints, since=date(2024, 6, 1), until=date(2024, 7, 1)
+    )
     state_path = tmp_path / "state.json"
     save_sync_state(str(state_path), state)
 
@@ -54,7 +53,9 @@ def test_build_sync_state_overwrites_previous_entries(tmp_path):
     e1 = _sample_event("AAPL")
     e2 = _sample_event("MSFT")
     diff = diff_events([e1, e2], load_sync_state(None))
-    state = build_sync_state([e1, e2], diff.fingerprints, since=date(2024, 1, 1), until=date(2024, 2, 1))
+    state = build_sync_state(
+        [e1, e2], diff.fingerprints, since=date(2024, 1, 1), until=date(2024, 2, 1)
+    )
 
     path = tmp_path / "sync.json"
     save_sync_state(str(path), state)

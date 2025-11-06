@@ -1,4 +1,5 @@
 """Defaults for earnings-to-calendar (friendly fallbacks)."""
+
 DEFAULT_LOOKAHEAD_DAYS = 120
 DEFAULT_TIMEOUT_SECONDS = 20
 USER_AGENT = "earnings-to-calendar/1.0"

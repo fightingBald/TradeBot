@@ -1,0 +1,456 @@
+"""Daily pipeline: fetch ARK holdings, diff vs baseline, emit summaries."""
+
+from __future__ import annotations
+
+import argparse
+import html
+import json
+import logging
+import shutil
+from pathlib import Path
+from typing import Dict, Iterable, List, Sequence
+
+from data_sources.ark_holdings import (FUND_CSV, HoldingSnapshot,
+                                       diff_snapshots, fetch_holdings_snapshot)
+from data_sources.ark_holdings.diff import HoldingChange
+from data_sources.ark_holdings.io import (load_snapshot_folder,
+                                          snapshot_collection_to_folder)
+from notification_svc import (EmailAttachment, EmailDeliveryError,
+                              EmailNotificationService, EmailSettings,
+                              load_recipient_config)
+
+logger = logging.getLogger("ark_pipeline")
+
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description="Fetch, diff, and persist ARK ETF holdings snapshots."
+    )
+    parser.add_argument(
+        "--baseline-dir",
+        default="baseline_snapshots",
+        help="Existing baseline snapshot directory downloaded from artifact.",
+    )
+    parser.add_argument(
+        "--output-dir",
+        default="temp/ark_pipeline/latest_snapshots",
+        help="Directory to store freshly fetched snapshots (also uploaded as new baseline).",
+    )
+    parser.add_argument(
+        "--summary-path",
+        default="temp/ark_pipeline/diff_summary.md",
+        help="Path to write Markdown summary of changes.",
+    )
+    parser.add_argument(
+        "--summary-json",
+        default="temp/ark_pipeline/diff_summary.json",
+        help="Path to write machine-readable JSON summary.",
+    )
+    parser.add_argument(
+        "--etfs",
+        help="Comma separated ETF symbols to process (default: all).",
+    )
+    parser.add_argument("--timeout", type=int, default=30, help="HTTP timeout seconds.")
+    parser.add_argument(
+        "--top", type=int, default=10, help="Top N changes shown per ETF."
+    )
+    parser.add_argument(
+        "--weight-threshold",
+        type=float,
+        default=1e-4,
+        help="Minimum absolute weight change required to flag a diff.",
+    )
+    parser.add_argument(
+        "--share-threshold",
+        type=float,
+        default=1.0,
+        help="Minimum absolute share change required to flag a diff.",
+    )
+    parser.add_argument(
+        "--log-level",
+        default="INFO",
+        choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
+        help="Logging verbosity.",
+    )
+    parser.add_argument(
+        "--send-email",
+        action="store_true",
+        help="Send summary email using notification_svc. Requires EMAIL_* env vars.",
+    )
+    parser.add_argument(
+        "--recipient-config",
+        default="config/notification_recipients.toml",
+        help="Path to recipient TOML (used when --send-email).",
+    )
+    parser.add_argument(
+        "--email-subject",
+        default="ARK ETF Holdings Daily Update",
+        help="Email subject when --send-email is enabled.",
+    )
+    parser.add_argument(
+        "--holdings-limit",
+        type=int,
+        default=20,
+        help="Number of positions to show in holdings overview per ETF when emailing.",
+    )
+    return parser.parse_args()
+
+
+def main() -> None:
+    args = parse_args()
+    logging.basicConfig(level=getattr(logging, args.log_level))
+
+    symbols = _determine_symbols(args.etfs)
+    logger.info("Processing ETFs: %s", ", ".join(symbols))
+
+    baseline_snapshots = load_snapshot_folder(args.baseline_dir)
+    if baseline_snapshots:
+        logger.info(
+            "Loaded baseline snapshots for: %s", ", ".join(sorted(baseline_snapshots))
+        )
+    else:
+        logger.warning(
+            "No baseline snapshots found at %s (first run?)", args.baseline_dir
+        )
+
+    output_dir = Path(args.output_dir)
+    if output_dir.exists():
+        shutil.rmtree(output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    new_snapshots = {}
+    reports = []
+
+    for symbol in symbols:
+        logger.info("Fetching %s snapshot", symbol)
+        snapshot = fetch_holdings_snapshot(symbol, timeout=args.timeout)
+        new_snapshots[symbol] = snapshot
+
+        baseline = baseline_snapshots.get(symbol)
+        if baseline:
+            changes = diff_snapshots(
+                baseline,
+                snapshot,
+                weight_threshold=args.weight_threshold,
+                share_threshold=args.share_threshold,
+            )
+        else:
+            changes = []
+
+        report = _build_etf_report(symbol, baseline, snapshot, changes, args.top)
+        reports.append(report)
+
+    markdown = _render_markdown(reports)
+    summary_path = Path(args.summary_path)
+    summary_path.parent.mkdir(parents=True, exist_ok=True)
+    summary_path.write_text(markdown, encoding="utf-8")
+    logger.info("Wrote summary markdown: %s", summary_path)
+
+    summary_json_path = Path(args.summary_json)
+    summary_json_path.parent.mkdir(parents=True, exist_ok=True)
+    summary_json_path.write_text(
+        json.dumps({"etfs": reports}, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
+    logger.info("Wrote summary json: %s", summary_json_path)
+
+    snapshot_collection_to_folder(new_snapshots, output_dir)
+    logger.info("Prepared new baseline folder: %s", output_dir)
+
+    if args.send_email:
+        _send_email_report(
+            reports=reports,
+            snapshots=new_snapshots,
+            subject=args.email_subject,
+            recipient_config_path=args.recipient_config,
+            summary_markdown=summary_path,
+            summary_json=summary_json_path,
+            holdings_limit=args.holdings_limit,
+        )
+
+
+def _determine_symbols(symbols_arg: str | None) -> List[str]:
+    if not symbols_arg:
+        return list(FUND_CSV.keys())
+    symbols = [
+        token.strip().upper() for token in symbols_arg.split(",") if token.strip()
+    ]
+    invalid = [symbol for symbol in symbols if symbol not in FUND_CSV]
+    if invalid:
+        raise ValueError(f"不支持的 ETF: {', '.join(invalid)}")
+    return symbols
+
+
+def _build_etf_report(
+    symbol: str,
+    baseline: HoldingSnapshot | None,
+    current: HoldingSnapshot,
+    changes: Sequence[HoldingChange],
+    top_n: int,
+) -> dict:
+    buys, sells = _split_changes(changes)
+    report = {
+        "etf": symbol,
+        "current_as_of": current.as_of.isoformat(),
+        "baseline_as_of": baseline.as_of.isoformat() if baseline else None,
+        "total_holdings": len(current.holdings),
+        "changes": [change_to_dict(change) for change in changes],
+        "top_buys": [change_to_dict(change) for change in buys[:top_n]],
+        "top_sells": [change_to_dict(change) for change in sells[:top_n]],
+        "new_positions": [
+            change_to_dict(change) for change in changes if change.action == "new"
+        ],
+        "exited_positions": [
+            change_to_dict(change) for change in changes if change.action == "exit"
+        ],
+    }
+    return report
+
+
+def _split_changes(
+    changes: Sequence[HoldingChange],
+) -> tuple[List[HoldingChange], List[HoldingChange]]:
+    buys: List[HoldingChange] = []
+    sells: List[HoldingChange] = []
+    for change in changes:
+        if change.action in {"new", "buy"}:
+            buys.append(change)
+        elif change.action in {"exit", "sell"}:
+            sells.append(change)
+    buys.sort(key=lambda ch: abs(ch.weight_change), reverse=True)
+    sells.sort(key=lambda ch: abs(ch.weight_change), reverse=True)
+    return buys, sells
+
+
+def change_to_dict(change: HoldingChange) -> Dict[str, object]:
+    weight_change = change.weight_change or 0.0
+    shares_change = change.shares_change or 0.0
+    return {
+        "action": change.action,
+        "ticker": change.ticker,
+        "company": change.company,
+        "shares_change": shares_change,
+        "weight_change": weight_change,
+        "weight_change_abs": abs(weight_change),
+        "shares_change_abs": abs(shares_change),
+        "market_value_change": change.market_value_change,
+        "previous": change.previous.model_dump() if change.previous else None,
+        "current": change.current.model_dump() if change.current else None,
+    }
+
+
+def _render_markdown(reports: Iterable[dict]) -> str:
+    lines = [
+        "# ARK Holdings Daily Diff",
+        "",
+    ]
+    for report in reports:
+        lines.extend(_render_report_section(report))
+    return "\n".join(lines).strip() + "\n"
+
+
+def _render_report_section(report: dict) -> List[str]:
+    lines = [
+        f"## {report['etf']}",
+        f"- 最新快照日期：{report['current_as_of']}",
+    ]
+    baseline_as_of = report.get("baseline_as_of")
+    if baseline_as_of:
+        lines.append(f"- 基线快照日期：{baseline_as_of}")
+    else:
+        lines.append("- 基线快照缺失（首次运行？）")
+
+    total_changes = len(report["changes"])
+    lines.append(f"- 检测到的变更总数：{total_changes}")
+    lines.append(f"- 持仓总数：{report['total_holdings']}")
+
+    new_positions = report["new_positions"]
+    exited_positions = report["exited_positions"]
+    lines.append(f"- 新进标的：{len(new_positions)} 个")
+    lines.append(f"- 清仓标的：{len(exited_positions)} 个")
+
+    if report["top_buys"]:
+        lines.append("")
+        lines.append(f"### 增持 Top {len(report['top_buys'])}")
+        lines.extend(_format_table(report["top_buys"]))
+
+    if report["top_sells"]:
+        lines.append("")
+        lines.append(f"### 减持 Top {len(report['top_sells'])}")
+        lines.extend(_format_table(report["top_sells"]))
+
+    if not report["top_buys"] and not report["top_sells"]:
+        lines.append("")
+        lines.append("> 无超过阈值的增减持。")
+
+    lines.append("")
+    return lines
+
+
+def _format_table(entries: Sequence[dict]) -> List[str]:
+    header = "| Ticker | Company | Action | Shares Δ | Weight Δ | MV Δ |"
+    separator = "| --- | --- | --- | --- | --- | --- |"
+    rows = [header, separator]
+    for entry in entries:
+        shares = entry["shares_change"] or 0.0
+        weight = entry["weight_change"] or 0.0
+        mv = entry["market_value_change"]
+        mv_display = f"${mv:,.0f}" if mv is not None else "N/A"
+        rows.append(
+            f"| {entry['ticker']} | {entry['company']} | {entry['action']} | "
+            f"{shares:,.0f} | {weight:.4f} | {mv_display} |"
+        )
+    return rows
+
+
+def _send_email_report(
+    *,
+    reports: Sequence[dict],
+    snapshots: Dict[str, HoldingSnapshot],
+    subject: str,
+    recipient_config_path: str,
+    summary_markdown: Path,
+    summary_json: Path,
+    holdings_limit: int,
+) -> None:
+    recipients = load_recipient_config(recipient_config_path)
+    if not recipients.to and not recipients.cc and not recipients.bcc:
+        logger.warning("收件人列表为空，跳过发送邮件。")
+        return
+
+    try:
+        settings = EmailSettings()
+    except Exception as exc:  # pragma: no cover - settings validation
+        logger.error("邮件配置加载失败：%s", exc)
+        raise
+
+    service = EmailNotificationService(settings)
+    body_html = _render_email_html(reports, snapshots, holdings_limit=holdings_limit)
+
+    attachments: List[EmailAttachment] = []
+    if summary_markdown.exists():
+        attachments.append(
+            EmailAttachment(
+                filename=summary_markdown.name,
+                content=summary_markdown.read_bytes(),
+                mimetype="text/markdown",
+            )
+        )
+    if summary_json.exists():
+        attachments.append(
+            EmailAttachment(
+                filename=summary_json.name,
+                content=summary_json.read_bytes(),
+                mimetype="application/json",
+            )
+        )
+
+    logger.info("Sending email to %d recipients", len(recipients.to))
+    try:
+        service.send_email(
+            subject=subject,
+            body=body_html,
+            subtype="html",
+            recipients=recipients.to,
+            cc=recipients.cc,
+            bcc=recipients.bcc,
+            attachments=attachments,
+        )
+    except EmailDeliveryError as exc:
+        logger.error("邮件发送失败：%s", exc)
+        raise
+
+
+def _render_email_html(
+    reports: Sequence[dict],
+    snapshots: Dict[str, HoldingSnapshot],
+    *,
+    holdings_limit: int,
+) -> str:
+    lines: List[str] = [
+        "<html><body>",
+        "<h1>ARK Holdings Daily Diff</h1>",
+    ]
+    for report in reports:
+        etf = html.escape(report["etf"])
+        lines.append(f"<h2>{etf}</h2>")
+        lines.append("<ul>")
+        lines.append(f"<li>最新快照日期：{html.escape(report['current_as_of'])}</li>")
+        baseline_as_of = report.get("baseline_as_of")
+        if baseline_as_of:
+            lines.append(f"<li>基线快照日期：{html.escape(baseline_as_of)}</li>")
+        else:
+            lines.append("<li>基线快照缺失（首次运行？）</li>")
+        lines.append(f"<li>检测到的变更总数：{len(report['changes'])}</li>")
+        lines.append(f"<li>持仓总数：{report['total_holdings']}</li>")
+        lines.append(f"<li>新进标的：{len(report['new_positions'])} 个</li>")
+        lines.append(f"<li>清仓标的：{len(report['exited_positions'])} 个</li>")
+        lines.append("</ul>")
+
+        sorted_changes = sorted(
+            report["changes"],
+            key=lambda entry: entry.get("weight_change_abs", 0.0),
+            reverse=True,
+        )
+        if sorted_changes:
+            lines.append("<h3>持仓变化（按权重绝对值排序）</h3>")
+            lines.append(
+                "<table border='1' cellpadding='4' cellspacing='0'>"
+                "<thead><tr>"
+                "<th>Ticker</th><th>Company</th><th>Action</th>"
+                "<th>Shares Δ</th><th>Weight Δ</th><th>MV Δ</th>"
+                "</tr></thead><tbody>"
+            )
+            for change in sorted_changes:
+                weight = change.get("weight_change", 0.0) or 0.0
+                shares = change.get("shares_change", 0.0) or 0.0
+                mv = change.get("market_value_change")
+                mv_display = f"${mv:,.0f}" if mv is not None else "N/A"
+                lines.append(
+                    "<tr>"
+                    f"<td>{html.escape(change['ticker'])}</td>"
+                    f"<td>{html.escape(change['company'])}</td>"
+                    f"<td>{html.escape(change['action'])}</td>"
+                    f"<td>{shares:,.0f}</td>"
+                    f"<td>{weight:.4f}</td>"
+                    f"<td>{mv_display}</td>"
+                    "</tr>"
+                )
+            lines.append("</tbody></table>")
+        else:
+            lines.append("<p>无超过阈值的持仓变化。</p>")
+
+        snapshot = snapshots.get(report["etf"])
+        if snapshot:
+            lines.append(f"<h3>最新持仓概览（权重 Top {holdings_limit}）</h3>")
+            holdings_sorted = sorted(
+                snapshot.holdings, key=lambda h: h.weight or 0.0, reverse=True
+            )
+            lines.append(
+                "<table border='1' cellpadding='4' cellspacing='0'>"
+                "<thead><tr>"
+                "<th>#</th><th>Ticker</th><th>Company</th><th>Weight</th><th>Shares</th><th>Market Value</th>"
+                "</tr></thead><tbody>"
+            )
+            for idx, holding in enumerate(holdings_sorted[:holdings_limit], start=1):
+                weight = (holding.weight or 0.0) * 100
+                shares = holding.shares or 0.0
+                mv = holding.market_value
+                mv_display = f"${mv:,.0f}" if mv is not None else "N/A"
+                lines.append(
+                    "<tr>"
+                    f"<td>{idx}</td>"
+                    f"<td>{html.escape(holding.ticker)}</td>"
+                    f"<td>{html.escape(holding.company)}</td>"
+                    f"<td>{weight:.2f}%</td>"
+                    f"<td>{shares:,.0f}</td>"
+                    f"<td>{mv_display}</td>"
+                    "</tr>"
+                )
+            lines.append("</tbody></table>")
+        lines.append("<hr/>")
+    lines.append("</body></html>")
+    return "\n".join(lines)
+
+
+if __name__ == "__main__":
+    main()

@@ -5,19 +5,14 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import tomllib
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Mapping
 
-import tomllib
-
-from .defaults import (
-    DEFAULT_EVENT_DURATION_MINUTES,
-    DEFAULT_LOOKAHEAD_DAYS,
-    DEFAULT_SESSION_TIMES,
-    DEFAULT_SOURCE_TIMEZONE,
-    DEFAULT_TARGET_TIMEZONE,
-)
+from .defaults import (DEFAULT_EVENT_DURATION_MINUTES, DEFAULT_LOOKAHEAD_DAYS,
+                       DEFAULT_SESSION_TIMES, DEFAULT_SOURCE_TIMEZONE,
+                       DEFAULT_TARGET_TIMEZONE)
 from .logging_utils import get_logger
 
 logger = get_logger()
@@ -150,10 +145,14 @@ def load_env_file(path: str | None, *, search_root: Path | None = None) -> None:
             _read_env_file(candidate)
             logger.info("已加载环境变量文件：%s", candidate)
             return
-    logger.debug("未找到可用的环境变量文件，候选路径：%s", ", ".join(str(c) for c in candidates))
+    logger.debug(
+        "未找到可用的环境变量文件，候选路径：%s", ", ".join(str(c) for c in candidates)
+    )
 
 
-def load_config(config_path: str | None, default_path: Path | None = None) -> tuple[Dict[str, Any], Path | None]:
+def load_config(
+    config_path: str | None, default_path: Path | None = None
+) -> tuple[Dict[str, Any], Path | None]:
     """Read CLI configuration from TOML or JSON."""
     cfg_path: Path | None = None
     create_template = False
@@ -317,7 +316,9 @@ def build_runtime_options(
         or env_google_credentials
         or _DEFAULT_GOOGLE_CREDENTIALS
     )
-    google_credentials = _resolve_path(raw_google_credentials, base=config_base, root=project_root)
+    google_credentials = _resolve_path(
+        raw_google_credentials, base=config_base, root=project_root
+    )
 
     env_google_token = os.getenv(_ENV_KEY_GOOGLE_TOKEN)
     raw_google_token = (
@@ -358,7 +359,9 @@ def build_runtime_options(
             google_create_calendar = config_create_flag
         else:
             env_create_flag = _coerce_bool(os.getenv(_ENV_KEY_GOOGLE_CREATE_CAL))
-            google_create_calendar = env_create_flag if env_create_flag is not None else False
+            google_create_calendar = (
+                env_create_flag if env_create_flag is not None else False
+            )
 
     source_timezone = (
         getattr(parsed, "source_tz", None)
@@ -377,9 +380,13 @@ def build_runtime_options(
     if getattr(parsed, "event_duration", None) is not None:
         event_duration = int(parsed.event_duration)
     elif "event_duration_minutes" in config:
-        event_duration = _coerce_int(config.get("event_duration_minutes"), field="event_duration_minutes")
+        event_duration = _coerce_int(
+            config.get("event_duration_minutes"), field="event_duration_minutes"
+        )
     else:
-        event_duration = int(os.getenv(_ENV_KEY_EVENT_DURATION) or DEFAULT_EVENT_DURATION_MINUTES)
+        event_duration = int(
+            os.getenv(_ENV_KEY_EVENT_DURATION) or DEFAULT_EVENT_DURATION_MINUTES
+        )
     if event_duration <= 0:
         raise ValueError("event_duration_minutes 必须为正整数")
 
@@ -393,18 +400,28 @@ def build_runtime_options(
     if getattr(parsed, "market_events", None):
         market_events = True
     else:
-        config_market_events = _coerce_bool(config.get("market_events")) if "market_events" in config else None
+        config_market_events = (
+            _coerce_bool(config.get("market_events"))
+            if "market_events" in config
+            else None
+        )
         if config_market_events is not None:
             market_events = config_market_events
         else:
             env_market_events = _coerce_bool(os.getenv(_ENV_KEY_MARKET_EVENTS))
-            market_events = env_market_events if env_market_events is not None else False
+            market_events = (
+                env_market_events if env_market_events is not None else False
+            )
 
     if getattr(parsed, "google_insert", None):
         google_insert = True
     else:
         google_insert = False
-        config_google_insert = _coerce_bool(config.get("google_insert")) if "google_insert" in config else None
+        config_google_insert = (
+            _coerce_bool(config.get("google_insert"))
+            if "google_insert" in config
+            else None
+        )
         if config_google_insert is not None:
             google_insert = config_google_insert
         else:
@@ -416,7 +433,11 @@ def build_runtime_options(
         icloud_insert = True
     else:
         icloud_insert = False
-        config_icloud_insert = _coerce_bool(config.get("icloud_insert")) if "icloud_insert" in config else None
+        config_icloud_insert = (
+            _coerce_bool(config.get("icloud_insert"))
+            if "icloud_insert" in config
+            else None
+        )
         if config_icloud_insert is not None:
             icloud_insert = config_icloud_insert
         else:
@@ -438,7 +459,11 @@ def build_runtime_options(
     if getattr(parsed, "macro_events", None):
         macro_events = True
     else:
-        config_macro_events = _coerce_bool(config.get("macro_events")) if "macro_events" in config else None
+        config_macro_events = (
+            _coerce_bool(config.get("macro_events"))
+            if "macro_events" in config
+            else None
+        )
         if config_macro_events is not None:
             macro_events = config_macro_events
         else:
@@ -454,7 +479,11 @@ def build_runtime_options(
 
     incremental_sync = bool(getattr(parsed, "incremental", False))
     if not incremental_sync:
-        config_incremental = _coerce_bool(config.get("incremental_sync")) if "incremental_sync" in config else None
+        config_incremental = (
+            _coerce_bool(config.get("incremental_sync"))
+            if "incremental_sync" in config
+            else None
+        )
         if config_incremental is not None:
             incremental_sync = config_incremental
         else:
@@ -482,7 +511,9 @@ def build_runtime_options(
         google_insert=google_insert,
         google_credentials=str(google_credentials),
         google_token=str(google_token),
-        google_calendar_id=str(google_calendar_id) if google_calendar_id is not None else None,
+        google_calendar_id=(
+            str(google_calendar_id) if google_calendar_id is not None else None
+        ),
         google_calendar_name=google_calendar_name,
         google_create_calendar=google_create_calendar,
         source_timezone=str(source_timezone),
