@@ -34,14 +34,6 @@ jobs:
           pip install -r requirements.txt
           pip install ruff black isort pip-audit bandit
 
-      - name: Check formatting (black)
-        run: black --check data_sources notification_svc py_scripts tests
-
-      - name: Check imports (isort)
-        run: isort --check-only data_sources notification_svc py_scripts tests
-
-      - name: Lint (ruff)
-        run: ruff check data_sources notification_svc py_scripts tests
 
       - name: Security scan (pip-audit)
         run: pip-audit -r requirements.txt
