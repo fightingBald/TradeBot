@@ -63,6 +63,7 @@ jobs:
           MIN_SHARE_DELTA: ${{ vars.MIN_SHARE_DELTA }}
           MIN_WEIGHT_BP: ${{ vars.MIN_WEIGHT_BP }}
           TIMEZONE: ${{ vars.TIMEZONE }}
+          PYTHONPATH: ${{ github.workspace }}
         run: |
           set -euo pipefail
 
