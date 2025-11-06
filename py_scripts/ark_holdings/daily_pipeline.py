@@ -150,7 +150,8 @@ def main() -> None:
     summary_json_path = Path(args.summary_json)
     summary_json_path.parent.mkdir(parents=True, exist_ok=True)
     summary_json_path.write_text(
-        json.dumps({"etfs": reports}, ensure_ascii=False, indent=2), encoding="utf-8"
+        json.dumps({"etfs": reports}, ensure_ascii=False, indent=2, default=_json_default),
+        encoding="utf-8",
     )
     logger.info("Wrote summary json: %s", summary_json_path)
 
@@ -301,6 +302,15 @@ def _format_table(entries: Sequence[dict]) -> List[str]:
             f"{shares:,.0f} | {weight:.4f} | {mv_display} |"
         )
     return rows
+
+
+def _json_default(value):
+    if hasattr(value, "isoformat"):
+        try:
+            return value.isoformat()
+        except TypeError:
+            pass
+    return str(value)
 
 
 def _send_email_report(
