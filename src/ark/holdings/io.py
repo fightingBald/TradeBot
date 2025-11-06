@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from math import isnan
 from pathlib import Path
 from typing import Mapping
 
@@ -56,13 +57,13 @@ def dataframe_to_snapshot(df: pd.DataFrame) -> HoldingSnapshot:
             Holding(
                 as_of=as_of,
                 etf=etf,
-                company=str(row.get("company") or "").strip(),
-                ticker=str(row.get("ticker") or "").strip().upper(),
-                cusip=str(row.get("cusip") or "").strip() or None,
+            company=_normalize_str(row.get("company")),
+            ticker=_normalize_str(row.get("ticker")).upper(),
+            cusip=_normalize_optional_str(row.get("cusip")),
                 shares=_maybe_float(row.get("shares")),
                 market_value=_maybe_float(row.get("market_value")),
                 weight=_maybe_float(row.get("weight")),
-                price=_maybe_float(row.get("price")),
+            price=_maybe_float(row.get("price")),
             )
         )
 
@@ -116,6 +117,8 @@ def _maybe_float(value: object) -> float | None:
     if value is None:
         return None
     if isinstance(value, float):
+        if isnan(value):
+            return None
         return value
     if isinstance(value, int):
         return float(value)
@@ -125,3 +128,18 @@ def _maybe_float(value: object) -> float | None:
         return float(value)
     except Exception:
         return None
+
+
+def _normalize_str(value: object) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, float) and isnan(value):
+        return ""
+    if isinstance(value, str):
+        return value.strip()
+    return str(value).strip()
+
+
+def _normalize_optional_str(value: object) -> str | None:
+    normalized = _normalize_str(value)
+    return normalized or None
