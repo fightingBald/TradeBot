@@ -273,26 +273,68 @@ def _is_meaningful_change_dict(change: dict) -> bool:
     shares = abs(change.get("shares_change") or 0.0)
     return weight > 1e-9 or shares >= 1.0
 
-def _build_global_summary(reports: Sequence[dict], top_n: int) -> dict:
-    buys: List[dict] = []
-    sells: List[dict] = []
+def _build_global_summary(reports: Sequence[dict]) -> dict:
+    buys = _aggregate_changes(reports, {"new", "buy"}, aggregate_action="buy")
+    sells = _aggregate_changes(reports, {"sell", "exit"}, aggregate_action="sell")
+    return {"buys": buys, "sells": sells}
 
+
+def _aggregate_changes(
+    reports: Sequence[dict],
+    actions: set[str],
+    *,
+    aggregate_action: str,
+) -> List[dict]:
+    buckets: Dict[tuple[str, str], dict] = {}
     for report in reports:
         for change in report["changes"]:
+            if change.get("action") not in actions:
+                continue
             if not _is_meaningful_change_dict(change):
                 continue
-            entry = dict(change)
-            entry["etf"] = change.get("etf") or report["etf"]
-            if change["action"] in {"new", "buy"}:
-                buys.append(entry)
-            elif change["action"] in {"exit", "sell"}:
-                sells.append(entry)
-
-    key = lambda ch: abs(ch.get("weight_change") or 0.0)
-    buys.sort(key=key, reverse=True)
-    sells.sort(key=key, reverse=True)
-
-    return {"buys": buys, "sells": sells}
+            shares_delta = abs(change.get("shares_change") or 0.0)
+            if shares_delta < 1.0:
+                continue
+            ticker = change.get("ticker") or ""
+            company = change.get("company") or ""
+            key = (ticker, company)
+            bucket = buckets.setdefault(
+                key,
+                {
+                    "ticker": ticker,
+                    "company": company,
+                    "action": aggregate_action,
+                    "shares_change": 0.0,
+                    "weight_change_abs": 0.0,
+                    "weight_change_net": 0.0,
+                    "market_value_change_abs": 0.0,
+                    "market_value_change_net": 0.0,
+                    "is_new": False,
+                    "is_exit": False,
+                    "etf_contribs": [],
+                },
+            )
+            bucket["shares_change"] += shares_delta
+            weight_delta = change.get("weight_change") or 0.0
+            mv_delta = change.get("market_value_change") or 0.0
+            bucket["weight_change_abs"] += abs(weight_delta)
+            bucket["weight_change_net"] += weight_delta
+            bucket["market_value_change_abs"] += abs(mv_delta)
+            bucket["market_value_change_net"] += mv_delta
+            bucket["is_new"] = bucket["is_new"] or change.get("is_new")
+            bucket["is_exit"] = bucket["is_exit"] or change.get("is_exit")
+            bucket["etf_contribs"].append(
+                {
+                    "etf": change.get("etf") or report["etf"],
+                    "action": change.get("action"),
+                    "weight_change": change.get("weight_change"),
+                    "shares_change": change.get("shares_change"),
+                    "market_value_change": change.get("market_value_change"),
+                }
+            )
+    aggregated = list(buckets.values())
+    aggregated.sort(key=lambda entry: abs(entry.get("weight_change_net") or 0.0), reverse=True)
+    return aggregated
 
 
 def _render_markdown(reports: Iterable[dict], global_summary: dict) -> str:
@@ -340,17 +382,21 @@ def _render_report_section(report: dict) -> List[str]:
 
 
 def _format_table(entries: Sequence[dict]) -> List[str]:
-    header = "| Ticker | Company | Action | Shares Δ | Weight Δ | MV Δ | ETF |"
-    separator = "| --- | --- | --- | --- | --- | --- | --- |"
+    header = "| Ticker | Company | Action | Shares Δ | Weight Δ (abs) | MV Δ (abs) | Net Weight Δ | Net MV Δ | ETF |"
+    separator = "| --- | --- | --- | --- | --- | --- | --- | --- | --- |"
     rows = [header, separator]
     for entry in entries:
-        shares = entry["shares_change"] or 0.0
-        weight = entry["weight_change"] or 0.0
-        mv = entry["market_value_change"]
-        mv_display = f"${mv:,.0f}" if mv is not None else "N/A"
+        shares_abs = _display_delta(entry, "shares_change")
+        weight_abs = _display_delta(entry, "weight_change")
+        mv_abs = _display_delta(entry, "market_value_change")
+        mv_abs_display = f"${mv_abs:,.0f}" if mv_abs is not None else "N/A"
+        weight_net = entry.get("weight_change") or 0.0
+        mv_net = entry.get("market_value_change")
+        mv_net_display = f"${mv_net:,.0f}" if mv_net is not None else "N/A"
         rows.append(
             f"| {entry['ticker']} | {entry['company']} | {entry['action']} | "
-            f"{shares:,.0f} | {weight:.4f} | {mv_display} | {entry.get('etf')} |"
+            f"{shares_abs:,.0f} | {weight_abs:.4f} | {mv_abs_display} | "
+            f"{weight_net:+.4f} | {mv_net_display} | {entry.get('etf')} |"
         )
     return rows
 
@@ -383,22 +429,21 @@ def _format_global_table(
     include_new: bool = False,
     include_exit: bool = False,
 ) -> List[str]:
-    left = "| Ticker | Company | Action | Shares Δ | Weight Δ | MV Δ | ETF |"
-    if include_new:
-        header = left[:-1] + " 新进? |"
-        separator = "| --- | --- | --- | --- | --- | --- | --- | --- |"
-    elif include_exit:
-        header = left[:-1] + " 清仓? |"
-        separator = "| --- | --- | --- | --- | --- | --- | --- | --- |"
+    header = "| Ticker | Company | Action | Shares Δ | Weight Δ (abs) | MV Δ (abs) | Net Weight Δ | Net MV Δ | ETF |"
+    if include_new or include_exit:
+        header = header[:-1] + (" 新进? |" if include_new else " 清仓? |")
+        separator = "| --- | --- | --- | --- | --- | --- | --- | --- | --- |"
     else:
-        header = left
-        separator = "| --- | --- | --- | --- | --- | --- | --- |"
+        separator = "| --- | --- | --- | --- | --- | --- | --- | --- |"
     rows = [header, separator]
     for entry in entries:
-        shares = entry["shares_change"] or 0.0
-        weight = entry["weight_change"] or 0.0
-        mv = entry["market_value_change"]
-        mv_display = f"${mv:,.0f}" if mv is not None else "N/A"
+        shares = entry.get("shares_change") or 0.0
+        weight_abs = entry.get("weight_change_abs") or 0.0
+        mv_abs = entry.get("market_value_change_abs") or 0.0
+        weight_net = entry.get("weight_change_net") or 0.0
+        mv_net = entry.get("market_value_change_net")
+        mv_abs_display = f"${mv_abs:,.0f}"
+        mv_net_display = f"${mv_net:,.0f}" if mv_net is not None else "N/A"
         indicator = ""
         if include_new:
             indicator = "✅" if entry.get("is_new") else ""
@@ -406,7 +451,9 @@ def _format_global_table(
             indicator = "✅" if entry.get("is_exit") else ""
         rows.append(
             f"| {entry['ticker']} | {entry['company']} | {entry['action']} | "
-            f"{shares:,.0f} | {weight:.4f} | {mv_display} | {entry['etf']} | {indicator} |"
+            f"{shares:,.0f} | {weight_abs:.4f} | {mv_abs_display} | "
+            f"{weight_net:+.4f} | {mv_net_display} | "
+            f"{_format_etf_contribs(entry)} | {indicator} |"
         )
     return rows
 
@@ -585,13 +632,13 @@ def _render_email_global(summary: dict) -> List[str]:
     sells = summary.get("sells", [])
 
     if buys:
-        lines.append("<h3>增持 Top {}</h3>".format(len(buys)))
+        lines.append("<h3>增持明细</h3>")
         lines.append(_format_global_html_table(buys, include_new=True))
     else:
         lines.append("<p>增持：无显著变动。</p>")
 
     if sells:
-        lines.append("<h3>减持 Top {}</h3>".format(len(sells)))
+        lines.append("<h3>减持明细</h3>")
         lines.append(_format_global_html_table(sells, include_exit=True))
     else:
         lines.append("<p>减持：无显著变动。</p>")
@@ -611,16 +658,19 @@ def _format_global_html_table(
         "<table border='1' cellpadding='4' cellspacing='0'>",
         "<thead><tr>"
         "<th>Ticker</th><th>Company</th><th>Action</th>"
-        "<th>Shares Δ</th><th>Weight Δ</th><th>MV Δ</th>"
-        "<th>ETF</th>"
+        "<th>Shares Δ</th><th>Weight Δ (abs)</th><th>MV Δ (abs)</th>"
+        "<th>Net Weight Δ</th><th>Net MV Δ</th><th>ETF</th>"
         f"<th>{header_extra}</th>"
         "</tr></thead><tbody>",
     ]
     for entry in entries:
-        shares = entry["shares_change"] or 0.0
-        weight = entry["weight_change"] or 0.0
-        mv = entry["market_value_change"]
-        mv_display = f"${mv:,.0f}" if mv is not None else "N/A"
+        shares = entry.get("shares_change") or 0.0
+        weight_abs = entry.get("weight_change_abs") or 0.0
+        mv_abs = entry.get("market_value_change_abs") or 0.0
+        weight_net = entry.get("weight_change_net") or 0.0
+        mv_net = entry.get("market_value_change_net")
+        mv_abs_display = f"${mv_abs:,.0f}"
+        mv_net_display = f"${mv_net:,.0f}" if mv_net is not None else "N/A"
         indicator = ""
         if include_new:
             indicator = "✅" if entry.get("is_new") else ""
@@ -628,18 +678,53 @@ def _format_global_html_table(
             indicator = "✅" if entry.get("is_exit") else ""
         rows.append(
             "<tr>"
-            f"<td>{html.escape(entry['ticker'])}</td>"
-            f"<td>{html.escape(entry['company'])}</td>"
-            f"<td>{html.escape(entry['action'])}</td>"
+            f"<td>{html_escape(entry['ticker'])}</td>"
+            f"<td>{html_escape(entry['company'])}</td>"
+            f"<td>{html_escape(entry['action'])}</td>"
             f"<td>{shares:,.0f}</td>"
-            f"<td>{weight:.4f}</td>"
-            f"<td>{mv_display}</td>"
-            f"<td>{html.escape(entry['etf'])}</td>"
+            f"<td>{weight_abs:.4f}</td>"
+            f"<td>{mv_abs_display}</td>"
+            f"<td>{weight_net:+.4f}</td>"
+            f"<td>{mv_net_display}</td>"
+            f"<td>{html_escape(_format_etf_contribs(entry, html=True))}</td>"
             f"<td>{indicator}</td>"
             "</tr>"
         )
     rows.append("</tbody></table>")
     return "\n".join(rows)
+
+
+def _display_delta(change: dict, key: str) -> float | None:
+    value = change.get(key)
+    if value is None:
+        return None
+    magnitude = abs(value)
+    action = change.get("action")
+    if action in {"new", "buy"}:
+        return magnitude
+    return -magnitude
+
+
+def _format_etf_contribs(entry: dict, *, html: bool = False) -> str:
+    contribs = entry.get("etf_contribs") or []
+    parts = []
+    for contrib in contribs:
+        weight = _display_delta(contrib, "weight_change")
+        if weight is None:
+            continue
+        label = f"{weight:+.4f}"
+        etf_label = contrib.get("etf") or ""
+        if html:
+            etf_label = html_escape(etf_label)
+        parts.append(f"{etf_label}({label})")
+    if not parts:
+        fallback = entry.get("etf") or ""
+        return html_escape(fallback) if html else fallback
+    return ", ".join(parts)
+
+
+def html_escape(text: str) -> str:
+    return html.escape(text or "")
 
 
 def _resolve_recipients(recipient_config_path: str) -> RecipientConfig:

@@ -152,6 +152,15 @@ Once running, the API provides:
 - **邮件回退**：若 TOML 文件缺失，管道会自动读取 `EMAIL_RECIPIENTS_*` 变量；空字符串会被忽略，防止 Pydantic 校验失败。
 - **CI 调度脚本**：`scripts/run_ark_pipeline.py` 统一处理 GitHub Actions `vars`/`secrets`，减少 YAML 中的复杂 Bash，亦可本地复用。
 
+### Trading Utilities
+
+- `py_scripts/alpaca/set_stop_losses.py`：遍历 Alpaca 账户当前持仓，并在现价下方（默认 3%）批量挂出止损卖单。支持通过 `--stop-pct`、`--tolerance-pct`（控制替换旧单的阈值）以及 `--dry-run`（仅打印、不下单）进行微调。
+  ```bash
+  python py_scripts/alpaca/set_stop_losses.py \
+    --stop-pct 0.03 \
+    --tolerance-pct 0.005
+  ```
+
 ## Notes
 
 - Quote availability depends on the data feed tied to your Alpaca plan. Demo accounts usually have access to the `iex` feed.

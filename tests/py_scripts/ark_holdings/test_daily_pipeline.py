@@ -83,7 +83,7 @@ def test_render_email_html_orders_sections(baseline_snapshot, current_snapshot):
     report = _build_etf_report(
         "ARKK", baseline_snapshot, current_snapshot, changes, top_n=5
     )
-    summary = _build_global_summary([report], top_n=5)
+    summary = _build_global_summary([report])
     html_body = _render_email_html(
         [report], {"ARKK": current_snapshot}, holdings_limit=10, global_summary=summary
     )
