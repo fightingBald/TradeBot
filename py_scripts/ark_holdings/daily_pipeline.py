@@ -141,7 +141,7 @@ def main() -> None:
         report = _build_etf_report(symbol, baseline, snapshot, changes, args.top)
         reports.append(report)
 
-    global_summary = _build_global_summary(reports, args.top)
+    global_summary = _build_global_summary(reports)
 
     markdown = _render_markdown(reports, global_summary)
     summary_path = Path(args.summary_path)
