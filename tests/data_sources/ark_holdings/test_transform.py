@@ -3,7 +3,7 @@ import io
 import pandas as pd
 import pytest
 
-from lib.ark.holdings.transform import parse_snapshot
+from toolkits.ark.holdings.transform import parse_snapshot
 
 
 def test_parse_snapshot_normalizes_columns_and_values():

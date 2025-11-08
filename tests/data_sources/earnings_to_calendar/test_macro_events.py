@@ -2,8 +2,8 @@ from datetime import date
 
 import pytest
 
-from lib.calendar_svc import fetch_macro_events
-from lib.calendar_svc import RuntimeOptions
+from toolkits.calendar_svc import fetch_macro_events
+from toolkits.calendar_svc import RuntimeOptions
 
 
 class _Response:
@@ -86,7 +86,7 @@ def test_fetch_macro_events_includes_high_importance_events(monkeypatch):
         captured["params"] = params
         return _Response(payload)
 
-    monkeypatch.setattr("lib.calendar_svc.macro_events._http_get", fake_get)
+    monkeypatch.setattr("toolkits.calendar_svc.macro_events._http_get", fake_get)
 
     options = _base_options()
     events = fetch_macro_events(date(2024, 9, 1), date(2024, 9, 30), options)
@@ -135,7 +135,7 @@ def test_fetch_macro_events_handles_results_key(monkeypatch):
     }
 
     monkeypatch.setattr(
-        "lib.calendar_svc.macro_events._http_get",
+        "toolkits.calendar_svc.macro_events._http_get",
         lambda params: _Response(payload),
     )
 

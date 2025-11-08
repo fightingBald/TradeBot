@@ -8,12 +8,12 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
-LIB_DIR = ROOT.parent / "lib"
+LIB_DIR = ROOT.parent / "toolkits"
 if LIB_DIR.exists() and str(LIB_DIR) not in sys.path:
     sys.path.insert(0, str(LIB_DIR))
 
-from lib.notifications import (EmailNotificationService, EmailSettings,
-                               load_recipient_config)
+from toolkits.notifications import (EmailNotificationService, EmailSettings,
+                                    load_recipient_config)
 
 
 def main() -> None:

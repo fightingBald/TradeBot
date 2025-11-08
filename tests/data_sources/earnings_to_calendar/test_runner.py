@@ -1,12 +1,12 @@
 from datetime import date, datetime
 from zoneinfo import ZoneInfo
 
-import lib.calendar_svc.calendars as calendars_mod
-import lib.calendar_svc.runner as runner_mod
-from lib.calendar_svc import providers as providers_mod
-from lib.calendar_svc.domain import EarningsEvent
-from lib.calendar_svc import run
-from lib.calendar_svc import RuntimeOptions
+import toolkits.calendar_svc.calendars as calendars_mod
+import toolkits.calendar_svc.runner as runner_mod
+from toolkits.calendar_svc import providers as providers_mod
+from toolkits.calendar_svc.domain import EarningsEvent
+from toolkits.calendar_svc import run
+from toolkits.calendar_svc import RuntimeOptions
 
 
 class _StubProvider:

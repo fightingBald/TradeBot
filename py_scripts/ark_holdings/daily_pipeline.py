@@ -15,18 +15,18 @@ from typing import Dict, Iterable, List, Sequence
 ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
-LIB_DIR = ROOT / "lib"
+LIB_DIR = ROOT / "toolkits"
 if LIB_DIR.exists() and str(LIB_DIR) not in sys.path:
     sys.path.insert(0, str(LIB_DIR))
 
-from lib.ark.holdings import (FUND_CSV, HoldingSnapshot, diff_snapshots,
-                              fetch_holdings_snapshot)
-from lib.ark.holdings.diff import HoldingChange
-from lib.ark.holdings.io import (load_snapshot_folder,
-                                 snapshot_collection_to_folder)
-from lib.notifications import (EmailAttachment, EmailDeliveryError,
-                               EmailNotificationService, EmailSettings,
-                               RecipientConfig, load_recipient_config)
+from toolkits.ark.holdings import (FUND_CSV, HoldingSnapshot, diff_snapshots,
+                                   fetch_holdings_snapshot)
+from toolkits.ark.holdings.diff import HoldingChange
+from toolkits.ark.holdings.io import (load_snapshot_folder,
+                                      snapshot_collection_to_folder)
+from toolkits.notifications import (EmailAttachment, EmailDeliveryError,
+                                    EmailNotificationService, EmailSettings,
+                                    RecipientConfig, load_recipient_config)
 
 logger = logging.getLogger("ark_pipeline")
 

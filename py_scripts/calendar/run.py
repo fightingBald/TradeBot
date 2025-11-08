@@ -11,13 +11,13 @@ from typing import Sequence
 ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
-LIB_DIR = ROOT / "lib"
+LIB_DIR = ROOT / "toolkits"
 if LIB_DIR.exists() and str(LIB_DIR) not in sys.path:
     sys.path.insert(0, str(LIB_DIR))
 
-from lib.calendar_svc.logging_utils import get_logger  # noqa: E402
-from lib.calendar_svc.runner import run  # noqa: E402
-from lib.calendar_svc.settings import (  # noqa: E402
+from toolkits.calendar_svc.logging_utils import get_logger  # noqa: E402
+from toolkits.calendar_svc.runner import run  # noqa: E402
+from toolkits.calendar_svc.settings import (  # noqa: E402
     build_runtime_options,
     load_config,
     load_env_file,

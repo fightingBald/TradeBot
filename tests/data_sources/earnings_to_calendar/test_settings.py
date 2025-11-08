@@ -5,12 +5,12 @@ from types import SimpleNamespace
 
 import pytest
 
-from lib.calendar_svc import (
+from toolkits.calendar_svc import (
     DEFAULT_EVENT_DURATION_MINUTES, DEFAULT_LOOKAHEAD_DAYS,
     DEFAULT_SESSION_TIMES, DEFAULT_SOURCE_TIMEZONE, DEFAULT_TARGET_TIMEZONE)
-from lib.calendar_svc import (RuntimeOptions,
-                          build_runtime_options, load_config,
-                          load_env_file, parse_symbols)
+from toolkits.calendar_svc import (RuntimeOptions,
+                                   build_runtime_options, load_config,
+                                   load_env_file, parse_symbols)
 
 
 def test_parse_symbols_normalizes_and_deduplicates():
