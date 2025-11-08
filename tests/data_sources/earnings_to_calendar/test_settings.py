@@ -3,12 +3,14 @@ import os
 from pathlib import Path
 from types import SimpleNamespace
 
-from src.earnings.calendar.defaults import (
+import pytest
+
+from lib.calendar_svc import (
     DEFAULT_EVENT_DURATION_MINUTES, DEFAULT_LOOKAHEAD_DAYS,
     DEFAULT_SESSION_TIMES, DEFAULT_SOURCE_TIMEZONE, DEFAULT_TARGET_TIMEZONE)
-from src.earnings.calendar.settings import (RuntimeOptions,
-                                            build_runtime_options, load_config,
-                                            load_env_file, parse_symbols)
+from lib.calendar_svc import (RuntimeOptions,
+                          build_runtime_options, load_config,
+                          load_env_file, parse_symbols)
 
 
 def test_parse_symbols_normalizes_and_deduplicates():
@@ -80,6 +82,7 @@ def _clear_env(monkeypatch):
         "ICLOUD_APP_PASSWORD",
         "MACRO_EVENTS",
         "MACRO_EVENT_KEYWORDS",
+        "MACRO_EVENT_SOURCE",
         "INCREMENTAL_SYNC",
         "SYNC_STATE_PATH",
     ]:
@@ -109,6 +112,7 @@ def test_build_runtime_options_merges_config(tmp_path, monkeypatch):
         "icloud_app_pass": "abcd-efgh",
         "macro_events": True,
         "macro_event_keywords": ["FOMC", "CPI"],
+        "macro_event_source": "benzinga",
     }
 
     parsed = SimpleNamespace(
@@ -132,6 +136,7 @@ def test_build_runtime_options_merges_config(tmp_path, monkeypatch):
         icloud_app_pass=None,
         macro_events=False,
         macro_event_keywords=None,
+        macro_event_source=None,
         incremental=False,
         sync_state_path=None,
     )
@@ -166,6 +171,7 @@ def test_build_runtime_options_merges_config(tmp_path, monkeypatch):
     assert options.market_events is True
     assert options.macro_events is True
     assert options.macro_event_keywords == ["FOMC", "CPI"]
+    assert options.macro_event_source == "benzinga"
     assert options.incremental_sync is False
     assert options.sync_state_path is None
 
@@ -201,6 +207,7 @@ def test_build_runtime_options_cli_overrides_config(tmp_path, monkeypatch):
         icloud_app_pass=None,
         macro_events=True,
         macro_event_keywords="Treasury",
+        macro_event_source="benzinga",
         incremental=True,
         sync_state_path="state.json",
     )
@@ -229,6 +236,7 @@ def test_build_runtime_options_cli_overrides_config(tmp_path, monkeypatch):
     assert options.market_events is True
     assert options.macro_events is True
     assert options.macro_event_keywords == ["Treasury"]
+    assert options.macro_event_source == "benzinga"
     assert options.incremental_sync is True
     assert options.sync_state_path.endswith("state.json")
 
@@ -248,6 +256,7 @@ def test_build_runtime_options_uses_env_defaults(tmp_path, monkeypatch):
     monkeypatch.setenv("EVENT_DURATION_MINUTES", "75")
     monkeypatch.setenv("SESSION_TIMES", "BMO=07:45,AMC=19:00")
     monkeypatch.setenv("MACRO_EVENT_KEYWORDS", "FOMC,NFP")
+    monkeypatch.setenv("MACRO_EVENT_SOURCE", "benzinga")
     monkeypatch.setenv("INCREMENTAL_SYNC", "true")
     monkeypatch.setenv("SYNC_STATE_PATH", "state/cache.json")
     monkeypatch.setenv("ICLOUD_INSERT", "1")
@@ -275,6 +284,7 @@ def test_build_runtime_options_uses_env_defaults(tmp_path, monkeypatch):
         icloud_app_pass=None,
         macro_events=False,
         macro_event_keywords=None,
+        macro_event_source=None,
         incremental=False,
         sync_state_path=None,
     )
@@ -307,6 +317,7 @@ def test_build_runtime_options_uses_env_defaults(tmp_path, monkeypatch):
     assert options.icloud_app_pass == "pass-1234"
     assert options.macro_events is True
     assert options.macro_event_keywords == ["FOMC", "NFP"]
+    assert options.macro_event_source == "benzinga"
     assert options.incremental_sync is True
     assert options.sync_state_path.endswith("state/cache.json")
 
@@ -346,6 +357,7 @@ def test_build_runtime_options_resolves_paths_relative_to_config(tmp_path, monke
         icloud_app_pass=None,
         macro_events=False,
         macro_event_keywords=None,
+        macro_event_source=None,
         incremental=False,
         sync_state_path=None,
     )
@@ -366,5 +378,44 @@ def test_build_runtime_options_resolves_paths_relative_to_config(tmp_path, monke
     assert options.session_time_map == DEFAULT_SESSION_TIMES
     assert options.market_events is False
     assert options.macro_events is False
+    assert options.macro_event_source == "benzinga"
     assert options.incremental_sync is False
     assert options.sync_state_path is None
+
+
+def test_build_runtime_options_rejects_non_benzinga(tmp_path, monkeypatch):
+    _clear_env(monkeypatch)
+    config = {"symbols": ["AAPL"], "macro_event_source": "fmp"}
+    parsed = SimpleNamespace(
+        symbols=None,
+        source=None,
+        days=None,
+        export_ics=None,
+        google_insert=False,
+        google_credentials=None,
+        google_token=None,
+        google_calendar_id=None,
+        google_calendar_name=None,
+        google_create_calendar=False,
+        source_tz=None,
+        target_tz=None,
+        event_duration=None,
+        session_times=None,
+        market_events=False,
+        icloud_insert=False,
+        icloud_id=None,
+        icloud_app_pass=None,
+        macro_events=False,
+        macro_event_keywords=None,
+        macro_event_source=None,
+        incremental=False,
+        sync_state_path=None,
+    )
+
+    with pytest.raises(ValueError):
+        build_runtime_options(
+            parsed,
+            config,
+            config_base=None,
+            project_root=Path(tmp_path),
+        )

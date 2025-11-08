@@ -1,4 +1,4 @@
-"""Command line interface for earnings-to-calendar."""
+"""Command line entry point for the calendar pipeline."""
 
 from __future__ import annotations
 
@@ -8,9 +8,20 @@ import sys
 from pathlib import Path
 from typing import Sequence
 
-from .logging_utils import get_logger
-from .runner import run
-from .settings import build_runtime_options, load_config, load_env_file
+ROOT = Path(__file__).resolve().parents[2]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+LIB_DIR = ROOT / "lib"
+if LIB_DIR.exists() and str(LIB_DIR) not in sys.path:
+    sys.path.insert(0, str(LIB_DIR))
+
+from lib.calendar_svc.logging_utils import get_logger  # noqa: E402
+from lib.calendar_svc.runner import run  # noqa: E402
+from lib.calendar_svc.settings import (  # noqa: E402
+    build_runtime_options,
+    load_config,
+    load_env_file,
+)
 
 logger = get_logger()
 
@@ -77,6 +88,11 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Comma separated macro event keywords to filter, e.g. FOMC,CPI,NFP",
     )
     parser.add_argument(
+        "--macro-event-source",
+        choices=["benzinga"],
+        help="Macro economic data provider (only Benzinga is supported).",
+    )
+    parser.add_argument(
         "--incremental",
         action="store_true",
         help="Enable incremental Google Calendar sync",
@@ -108,7 +124,7 @@ def main(args: Sequence[str] | None = None) -> None:
     )
     logger.debug("Logger initialized with level %s", parsed.log_level.upper())
 
-    project_root = Path(__file__).resolve().parents[2]
+    project_root = ROOT
 
     load_env_file(parsed.env_file, search_root=project_root)
 
@@ -131,4 +147,5 @@ def main(args: Sequence[str] | None = None) -> None:
     run(options)
 
 
-__all__ = ["main"]
+if __name__ == "__main__":
+    main()

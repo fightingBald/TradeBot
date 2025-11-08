@@ -13,9 +13,9 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
-SRC = ROOT / "src"
-if SRC.exists() and str(SRC) not in sys.path:
-    sys.path.insert(0, str(SRC))
+LIB_DIR = ROOT / "lib"
+if LIB_DIR.exists() and str(LIB_DIR) not in sys.path:
+    sys.path.insert(0, str(LIB_DIR))
 
 from alpaca.trading.client import TradingClient  # type: ignore  # noqa: E402
 from alpaca.trading.enums import (  # type: ignore  # noqa: E402

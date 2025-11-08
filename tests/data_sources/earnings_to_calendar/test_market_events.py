@@ -1,8 +1,8 @@
 from datetime import date, datetime
 from zoneinfo import ZoneInfo
 
-from src.earnings.calendar.market_events import generate_market_events
-from src.earnings.calendar.settings import RuntimeOptions
+from lib.calendar_svc import generate_market_events
+from lib.calendar_svc import RuntimeOptions
 
 
 def test_generate_market_events():

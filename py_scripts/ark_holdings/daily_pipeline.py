@@ -8,15 +8,23 @@ import json
 import logging
 import os
 import shutil
+import sys
 from pathlib import Path
 from typing import Dict, Iterable, List, Sequence
 
-from src.ark.holdings import (FUND_CSV, HoldingSnapshot, diff_snapshots,
+ROOT = Path(__file__).resolve().parents[2]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+LIB_DIR = ROOT / "lib"
+if LIB_DIR.exists() and str(LIB_DIR) not in sys.path:
+    sys.path.insert(0, str(LIB_DIR))
+
+from lib.ark.holdings import (FUND_CSV, HoldingSnapshot, diff_snapshots,
                               fetch_holdings_snapshot)
-from src.ark.holdings.diff import HoldingChange
-from src.ark.holdings.io import (load_snapshot_folder,
+from lib.ark.holdings.diff import HoldingChange
+from lib.ark.holdings.io import (load_snapshot_folder,
                                  snapshot_collection_to_folder)
-from src.notifications import (EmailAttachment, EmailDeliveryError,
+from lib.notifications import (EmailAttachment, EmailDeliveryError,
                                EmailNotificationService, EmailSettings,
                                RecipientConfig, load_recipient_config)
 

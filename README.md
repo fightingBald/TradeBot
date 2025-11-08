@@ -79,22 +79,24 @@ Once running, the API provides:
 ## Project Layout
 
 - `app/` — FastAPI 层（配置、模型、服务、模板）。
-- `src/` — 共享业务模块：
-  - `src/ark/holdings/` — 木头姐 ETF 持仓抓取、清洗、差异化与 I/O。
-  - `src/earnings/calendar/` — 财报/宏观日程抓取、去重、日历输出。
-  - `src/notifications/` — 邮件通知实现与收件人配置。
-- `py_scripts/` — CLI & 作业脚本（在需要时把 `src` 加入 `sys.path`）。
+- `lib/` — 共享业务模块：
+  - `lib/ark/holdings/` — 木头姐 ETF 持仓抓取、清洗、差异化与 I/O。
+  - `lib/calendar_svc/` — 财报/宏观日程抓取、去重、日历输出。
+  - `lib/notifications/` — 邮件通知实现与收件人配置。
+- `py_scripts/` — CLI & 作业脚本。
 - `tests/` — 单元与集成测试，按模块就近布局。
 
 ## Data Utilities & Automation
 
 ### Earnings Calendar CLI
 
-- 入口：`src/earnings/calendar`。支持从 FMP/Finnhub 抓取财报或宏观事件并推送到 ICS / Google / iCloud。
+- 入口脚本：`py_scripts/calendar/run.py`（底层库在 `lib/calendar_svc`）。支持从 FMP/Finnhub 抓取财报或宏观事件并推送到 ICS / Google / iCloud。
 - 默认配置：`config/earnings_to_calendar.toml`（可覆盖时区、事件时长、会议时间等）。
+- 宏观事件使用 Benzinga 经济日历（仅 importance ≥ 3、仅美国事件）。启用 `--macro-events` 时请在 `.env` 写入 `BENZINGA_API_KEY=...`。
 - 快速启动：
   ```bash
-  python -m earnings.calendar \
+  cd /path/to/AlpacaTrading
+  python py_scripts/calendar/run.py \
     --config=config/earnings_to_calendar.toml \
     --env-file=.env \
     --google-insert \
@@ -102,6 +104,7 @@ Once running, the API provides:
     --log-level=INFO
   ```
 - 调试建议：通过 `--log-level=DEBUG` 或在 notebooks/fmp_data_check.ipynb 内验证 API Key。
+- 详细参数说明：`py_scripts/calendar/README.md`
 
 ### ARK Holdings Automation
 
@@ -122,6 +125,7 @@ Once running, the API provides:
 
 2. **本地运行（可选）**  
    ```bash
+   cd /path/to/AlpacaTrading
    python py_scripts/ark_holdings/daily_pipeline.py \
      --baseline-dir baseline_snapshots \
      --output-dir out/latest \
@@ -145,8 +149,8 @@ Once running, the API provides:
 
 #### 实现思路
 
-- **数据抓取**：`src/ark/holdings/provider.py` 负责下载并清洗 ARK 官方 CSV；`src/ark/holdings/io.py` 将快照与 CSV 互转，便于 Artifact 存取。  
-- **差异分析**：`src/ark/holdings/diff.py` 将当前快照与基线比对，产出增/减持及新进/退出动作；阈值通过环境变量控制。  
+- **数据抓取**：`lib/ark/holdings/provider.py` 负责下载并清洗 ARK 官方 CSV；`lib/ark/holdings/io.py` 将快照与 CSV 互转，便于 Artifact 存取。  
+- **差异分析**：`lib/ark/holdings/diff.py` 将当前快照与基线比对，产出增/减持及新进/退出动作；阈值通过环境变量控制。  
 - **报告产出**：`py_scripts/ark_holdings/daily_pipeline.py` 构建 Markdown 和 JSON，邮件正文按权重绝对变化排序，同时附带最新持仓 Top N 表。  
 - **Artifacts 管理**：基线仅保存在 GitHub Artifact，不写入主分支；上传前先清除旧版本，避免历史堆积。  
 - **邮件回退**：若 TOML 文件缺失，管道会自动读取 `EMAIL_RECIPIENTS_*` 变量；空字符串会被忽略，防止 Pydantic 校验失败。
@@ -156,6 +160,7 @@ Once running, the API provides:
 
 - `py_scripts/alpaca/set_stop_losses.py`：遍历 Alpaca 账户当前持仓，并在现价下方（默认 3%）批量挂出止损卖单。支持通过 `--stop-pct`、`--tolerance-pct`（控制替换旧单的阈值）以及 `--dry-run`（仅打印、不下单）进行微调。
   ```bash
+  cd /path/to/AlpacaTrading
   python py_scripts/alpaca/set_stop_losses.py \
     --stop-pct 0.03 \
     --tolerance-pct 0.005

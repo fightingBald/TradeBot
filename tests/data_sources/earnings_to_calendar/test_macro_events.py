@@ -2,8 +2,8 @@ from datetime import date
 
 import pytest
 
-from src.earnings.calendar.macro_events import fetch_macro_events
-from src.earnings.calendar.settings import RuntimeOptions
+from lib.calendar_svc import fetch_macro_events
+from lib.calendar_svc import RuntimeOptions
 
 
 class _Response:
@@ -39,6 +39,7 @@ def _base_options(**overrides):
         icloud_app_pass=None,
         macro_events=True,
         macro_event_keywords=[],
+        macro_event_source="benzinga",
         incremental_sync=False,
         sync_state_path=None,
     )
@@ -46,75 +47,102 @@ def _base_options(**overrides):
     return RuntimeOptions(**params)
 
 
-def test_fetch_macro_events_filters_known_events(monkeypatch):
-    monkeypatch.setenv("FMP_API_KEY", "demo")
+def test_fetch_macro_events_includes_high_importance_events(monkeypatch):
+    monkeypatch.setenv("BENZINGA_API_KEY", "bz_token")
 
     captured = {}
+    payload = {
+        "economics": [
+            {
+                "event_name": "FOMC Interest Rate Decision",
+                "event_date": "2024-09-18",
+                "event_time": "14:00",
+                "country": "USA",
+                "importance": 4,
+                "actual": "5.50%",
+                "consensus": "5.50%",
+                "event_category": "FOMC",
+            },
+            {
+                "event_name": "Housing Starts",
+                "event_date": "2024-09-18",
+                "event_time": "08:30",
+                "country": "USA",
+                "importance": 3,
+                "event_category": "Housing",
+            },
+            {
+                "event_name": "Housing Starts",
+                "event_date": "2024-09-18",
+                "event_time": "08:30",
+                "country": "USA",
+                "importance": 3,
+                "event_category": "Housing",
+            },
+        ]
+    }
 
-    payload = [
-        {
-            "event": "FOMC Meeting",
-            "date": "2024-09-18 14:00:00",
-            "country": "United States",
-            "actual": "5.50%",
-            "forecast": "5.50%",
-            "previous": "5.50%",
-            "importance": "High",
-        },
-        {
-            "event": "Housing Starts",
-            "date": "2024-09-18 08:30:00",
-            "country": "United States",
-        },
-    ]
-
-    def fake_get(url, params=None, headers=None, timeout=None):  # noqa: ANN001
-        captured["url"] = url
+    def fake_get(params):  # noqa: ANN001
         captured["params"] = params
-        captured["headers"] = headers
-        captured["timeout"] = timeout
         return _Response(payload)
 
-    monkeypatch.setattr("src.earnings.calendar.macro_events.requests.get", fake_get)
+    monkeypatch.setattr("lib.calendar_svc.macro_events._http_get", fake_get)
 
     options = _base_options()
     events = fetch_macro_events(date(2024, 9, 1), date(2024, 9, 30), options)
 
-    assert captured["url"].endswith("economic-calendar")
-    assert captured["params"]["from"] == "2024-09-01"
-    assert captured["params"]["to"] == "2024-09-30"
-    assert len(events) == 1
-    event = events[0]
-    assert event.symbol == "MACRO-FOMC-MEETING"
-    assert event.session == "FOMC"
-    assert event.notes.startswith("Country: United States")
-
-
-def test_fetch_macro_events_supports_custom_keywords(monkeypatch):
-    monkeypatch.setenv("FMP_API_KEY", "demo")
-
-    payload = [
-        {
-            "event": "30-Year Bond Auction",
-            "date": "2024-08-08 13:00:00",
-            "country": "United States",
-        }
-    ]
-
-    monkeypatch.setattr(
-        "src.earnings.calendar.macro_events.requests.get",
-        lambda *args, **kwargs: _Response(payload),
-    )
-
-    options = _base_options(macro_event_keywords=["Treasury"])
-    events = fetch_macro_events(date(2024, 8, 1), date(2024, 8, 31), options)
-
-    assert len(events) == 1
-    assert events[0].session == "TREASURY"
+    assert captured["params"]["parameters[date_from]"] == "2024-09-01"
+    assert captured["params"]["country"] == "USA"
+    assert len(events) == 3
+    symbols = {evt.symbol: evt for evt in events}
+    fomc = symbols["MACRO-FOMC-INTEREST-RATE-DECISION"]
+    assert fomc.source == "Benzinga-Economic"
+    assert fomc.session == "FOMC"
+    assert "Importance: 4" in fomc.notes
+    housing = next(evt for evt in events if evt.symbol.startswith("MACRO-HOUSING-STARTS"))
+    assert housing.session == "HOUSING"
 
 
 def test_fetch_macro_events_requires_api_key(monkeypatch):
-    monkeypatch.delenv("FMP_API_KEY", raising=False)
+    monkeypatch.delenv("BENZINGA_API_KEY", raising=False)
     options = _base_options()
     with pytest.raises(RuntimeError):
         fetch_macro_events(date(2024, 1, 1), date(2024, 1, 31), options)
+
+
+def test_fetch_macro_events_handles_results_key(monkeypatch):
+    monkeypatch.setenv("BENZINGA_API_KEY", "bz_token")
+
+    payload = {
+        "results": [
+            {
+                "event_name": "30-Year Bond Auction",
+                "event_date": "2024-08-08",
+                "event_time": "13:00",
+                "country": "USA",
+                "importance": 3,
+                "event_category": "Treasury",
+            },
+            {
+                "event_name": "Conference Board Index",
+                "event_date": "2024-08-08",
+                "event_time": "10:00",
+                "country": "USA",
+                "importance": 3,
+                "event_category": "Economic",
+            },
+        ]
+    }
+
+    monkeypatch.setattr(
+        "lib.calendar_svc.macro_events._http_get",
+        lambda params: _Response(payload),
+    )
+
+    options = _base_options()
+    events = fetch_macro_events(date(2024, 8, 1), date(2024, 8, 31), options)
+
+    assert len(events) == 2
+    sessions = {event.session for event in events}
+    assert "TREASURY" in sessions
+    assert "ECONOMIC" in sessions

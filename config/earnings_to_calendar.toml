@@ -34,7 +34,8 @@ event_duration_minutes = 60
 market_events = true
 
 # 是否添加宏观事件（FOMC / CPI / NFP 等）
-macro_events = false
+macro_events = true
+macro_event_source = "benzinga"
 macro_event_keywords = ["FOMC", "ECB", "BOE", "BOJ", "CPI", "PPI", "NFP", "Retail Sales", "ISM", "Treasury"]
 
 # 增量同步（仅对 Google Calendar 生效）

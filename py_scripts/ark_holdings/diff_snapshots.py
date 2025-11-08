@@ -4,8 +4,18 @@ from __future__ import annotations
 
 import argparse
 
-from src.ark.holdings import diff_snapshots, summarize_changes
-from src.ark.holdings.io import load_snapshot_csv
+import sys
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[2]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+LIB_DIR = ROOT / "lib"
+if LIB_DIR.exists() and str(LIB_DIR) not in sys.path:
+    sys.path.insert(0, str(LIB_DIR))
+
+from lib.ark.holdings import diff_snapshots, summarize_changes
+from lib.ark.holdings.io import load_snapshot_csv
 
 
 def main() -> None:

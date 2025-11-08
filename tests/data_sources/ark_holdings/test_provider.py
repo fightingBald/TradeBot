@@ -2,7 +2,7 @@ from datetime import date
 
 import pytest
 
-from src.ark.holdings import fetch_holdings_snapshot
+from lib.ark.holdings import fetch_holdings_snapshot
 
 
 class DummyResponse:
@@ -21,7 +21,7 @@ def test_fetch_holdings_snapshot(monkeypatch):
     def fake_get(url, timeout, headers):  # noqa: ANN001
         return DummyResponse(csv)
 
-    monkeypatch.setattr("src.ark.holdings.provider.requests.get", fake_get)
+    monkeypatch.setattr("lib.ark.holdings.provider.requests.get", fake_get)
 
     snapshot = fetch_holdings_snapshot("ARKK")
     assert snapshot.etf == "ARKK"

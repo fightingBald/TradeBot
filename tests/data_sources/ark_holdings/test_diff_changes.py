@@ -1,7 +1,7 @@
 from pathlib import Path
 
-from src.ark.holdings import diff_snapshots
-from src.ark.holdings.io import load_snapshot_csv
+from lib.ark.holdings import diff_snapshots
+from lib.ark.holdings.io import load_snapshot_csv
 
 
 DATA_DIR = Path(__file__).parent / "data"
