@@ -36,7 +36,7 @@ python py_scripts/calendar/run.py \
 
 # 使用配置文件 + .env，直接写入 Google Calendar
 python py_scripts/calendar/run.py \
-  --config=config/earnings_to_calendar.toml \
+  --config=config/events_to_google_calendar.toml \
   --env-file=.env \
   --google-insert \
   --market-events \
