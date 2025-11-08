@@ -1,4 +1,4 @@
-# Earnings → Calendar CLI defaults (TOML)
+# ings → Calendar CLI defaults (TOML)
 
 # 需要抓取的股票列表，可随时注释/调整
 symbols = ["CRWV","UBER","AMD", "META","QCOM","TSM" ,"PL", "SOFI","AAPL", "COIN", "NBIS", "ORCL","IBKR","SNOW", "XYZ","MRVL","HOOD", "PLTR", "OKLO", "AVGO", "CRCL", "TSLA", "FLNC", "GOOG", "RKLB", "MSFT", "NVDA"]
@@ -8,7 +8,6 @@ source = "fmp"
 
 # 查询天数（今天起算）
 days = 180
-
 
 # 打开写入 Google Calendar
 google_insert = true

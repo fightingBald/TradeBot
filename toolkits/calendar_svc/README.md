@@ -38,8 +38,8 @@ project_root = Path(__file__).resolve().parents[1]
 load_env_file(".env", search_root=project_root)
 
 config_data, config_base = load_config(
-    "config/earnings_to_calendar.toml",
-    default_path=project_root / "config" / "earnings_to_calendar.toml",
+    "config/events_to_google_calendar.toml",
+    default_path=project_root / "config" / "events_to_google_calendar.toml",
 )
 
 args = argparse.Namespace(

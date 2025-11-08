@@ -36,7 +36,7 @@ python py_scripts/calendar/run.py \
 
 # 使用配置文件 + .env，直接写入 Google Calendar
 python py_scripts/calendar/run.py \
-  --config=config/earnings_to_calendar.toml \
+  --config=config/events_to_google_calendar.toml\
   --env-file=.env \
   --google-insert \
   --market-events \
@@ -56,7 +56,7 @@ python py_scripts/calendar/run.py \
 - `--icloud-insert` + `--icloud-*`：写入 iCloud CalDAV。
 - `--source-tz` / `--target-tz`、`--event-duration`、`--session-times`：控制时间相关设置。
 - `--env-file`：读取 `.env` 风格文件；未提供则默认寻找项目根目录 `.env`。
-- `--config`：TOML/JSON 配置文件（默认 `config/earnings_to_calendar.toml`）。
+- `--config`：TOML/JSON 配置文件（默认 `config/events_to_google_calendar.toml`）。
 
 ## `.env` & 配置文件
 
@@ -68,7 +68,7 @@ python py_scripts/calendar/run.py \
   GOOGLE_TOKEN_PATH=secrets/token.json
   GOOGLE_INSERT=true
   ```
-- `config/earnings_to_calendar.toml` 可配置 symbols、时区、会话时间映射、是否启用市场/宏观事件、增量同步等。脚本会自动在命令行参数 > TOML > `.env` > 默认值 之间取优先级。
+- `config/events_to_google_calendar.toml` 可配置 symbols、时区、会话时间映射、是否启用市场/宏观事件、增量同步等。脚本会自动在命令行参数 > TOML > `.env` > 默认值 之间取优先级。
 
 ## Google Calendar 授权流程
 

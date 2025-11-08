@@ -6,7 +6,7 @@ ACTIVATE := . $(VENV)/bin/activate
 
 install:
 	$(PYTHON) -m pip install --upgrade pip
-	$(PYTHON) -m pip install -r requirements.txt
+	$(PYTHON) -m pip install -e .
 
 build:
 	$(PYTHON) -m compileall app toolkits py_scripts

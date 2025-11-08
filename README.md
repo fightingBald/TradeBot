@@ -12,10 +12,10 @@ This project exposes a small FastAPI application that fetches real-time quotes f
 > 所有命令默认在项目根目录执行：先 `cd /path/to/AlpacaTrading`。
 
 1. Create and activate a virtual environment.
-2. Install dependencies:
+2. Install the project in editable mode (adds all packages to `PYTHONPATH` and exposes console scripts):
    ```bash
    cd /path/to/AlpacaTrading
-   pip install -r requirements.txt
+   pip install -e .
    ```
 3. Provide your Alpaca credentials, either through environment variables or an `.env` file at the project root. Both the `ALPACA_*` and Alpaca's default `APCA_*` names are supported:
    ```
@@ -91,18 +91,21 @@ Once running, the API provides:
 ### Earnings Calendar CLI
 
 - 入口脚本：`py_scripts/calendar/run.py`（底层库在 `toolkits/calendar_svc`）。支持从 FMP/Finnhub 抓取财报或宏观事件并推送到 ICS / Google / iCloud。
-- 默认配置：`config/earnings_to_calendar.toml`（可覆盖时区、事件时长、会议时间等）。
+- 默认配置：`config/
+`（仓库已自带模板，可按需修改以匹配个人账户时区、事件时长、会议时间等）。
 - 宏观事件使用 Benzinga 经济日历（仅 importance ≥ 3、仅美国事件）。启用 `--macro-events` 时请在 `.env` 写入 `BENZINGA_API_KEY=...`。
-- 快速启动：
+- 快速启动（完成 `pip install -e .` 后即可使用 `earnings-calendar` CLI，无需修改 `PYTHONPATH`）：
   ```bash
   cd /path/to/AlpacaTrading
-  python py_scripts/calendar/run.py \
-    --config=config/earnings_to_calendar.toml \
+  earnings-calendar \
+    --config=config/events_to_google_calendar.toml
+ \
     --env-file=.env \
     --google-insert \
     --market-events \
     --log-level=INFO
   ```
+- 备用方案：`python -m py_scripts.calendar.run ...` 依然受支持，适合一次性或未安装命令的环境。
 - 调试建议：通过 `--log-level=DEBUG` 或在 notebooks/fmp_data_check.ipynb 内验证 API Key。
 - 详细参数说明：`py_scripts/calendar/README.md`
 

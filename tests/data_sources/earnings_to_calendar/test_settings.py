@@ -58,7 +58,7 @@ def test_load_config_reads_json(tmp_path):
 
 
 def test_load_config_defaults_to_toml(tmp_path):
-    default_path = tmp_path / "config" / "earnings_to_calendar.toml"
+    default_path = tmp_path / "config" / "events_to_google_calendar.toml"
     default_path.parent.mkdir()
     default_path.write_text('symbols = ["TSLA"]\n', encoding="utf-8")
 
