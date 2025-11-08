@@ -11,10 +11,7 @@ from toolkits.ark.holdings.io import snapshot_to_dataframe
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Fetch ARK ETF holdings snapshots.")
-    parser.add_argument(
-        "--etfs",
-        help="Comma separated ETF symbols (default: all).",
-    )
+    parser.add_argument("--etfs", help="Comma separated ETF symbols (default: all).")
     parser.add_argument(
         "--output-dir",
         default="data/ark_holdings",
@@ -27,9 +24,7 @@ def main() -> None:
     output_dir.mkdir(parents=True, exist_ok=True)
 
     if args.etfs:
-        symbols = [
-            token.strip().upper() for token in args.etfs.split(",") if token.strip()
-        ]
+        symbols = [token.strip().upper() for token in args.etfs.split(",") if token.strip()]
     else:
         symbols = list(FUND_CSV.keys())
 

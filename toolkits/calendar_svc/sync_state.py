@@ -2,12 +2,12 @@
 
 from __future__ import annotations
 
-import json
 import hashlib
+import json
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 from pathlib import Path
-from typing import Dict, Iterable, List, Mapping
 
 from .domain import EarningsEvent, earnings_key
 from .logging_utils import get_logger
@@ -23,20 +23,20 @@ class SyncEntry:
 
 @dataclass
 class SyncState:
-    events: Dict[str, SyncEntry] = field(default_factory=dict)
+    events: dict[str, SyncEntry] = field(default_factory=dict)
     time_window: Mapping[str, str] | None = None
 
 
 @dataclass
 class SyncDiff:
-    to_create: List[EarningsEvent] = field(default_factory=list)
-    to_update: List[EarningsEvent] = field(default_factory=list)
-    unchanged: List[EarningsEvent] = field(default_factory=list)
-    removed_keys: List[str] = field(default_factory=list)
-    fingerprints: Dict[str, str] = field(default_factory=dict)
+    to_create: list[EarningsEvent] = field(default_factory=list)
+    to_update: list[EarningsEvent] = field(default_factory=list)
+    unchanged: list[EarningsEvent] = field(default_factory=list)
+    removed_keys: list[str] = field(default_factory=list)
+    fingerprints: dict[str, str] = field(default_factory=dict)
 
 
-def _serialize_event(event: EarningsEvent) -> Dict[str, object]:
+def _serialize_event(event: EarningsEvent) -> dict[str, object]:
     return {
         "symbol": event.symbol,
         "date": event.iso_date,
@@ -87,7 +87,7 @@ def load_sync_state(path: str | None) -> SyncState:
         logger.warning("读取增量同步状态失败，将忽略并重新生成：%s", exc)
         return SyncState()
     events_payload = payload.get("events", {}) if isinstance(payload, dict) else {}
-    events: Dict[str, SyncEntry] = {}
+    events: dict[str, SyncEntry] = {}
     if isinstance(events_payload, dict):
         for key, entry in events_payload.items():
             if not isinstance(entry, dict):
@@ -102,23 +102,14 @@ def load_sync_state(path: str | None) -> SyncState:
 
 
 def _now_iso_utc() -> str:
-    return (
-        datetime.now(timezone.utc)
-        .replace(microsecond=0)
-        .isoformat()
-        .replace("+00:00", "Z")
-    )
+    return datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
 
 def build_sync_state(
-    events: Iterable[EarningsEvent],
-    fingerprints: Mapping[str, str],
-    *,
-    since: date,
-    until: date,
+    events: Iterable[EarningsEvent], fingerprints: Mapping[str, str], *, since: date, until: date
 ) -> SyncState:
     timestamp = _now_iso_utc()
-    entries: Dict[str, SyncEntry] = {}
+    entries: dict[str, SyncEntry] = {}
     for event in events:
         key = earnings_key(event)
         fingerprint = fingerprints.get(key)
@@ -134,10 +125,7 @@ def save_sync_state(path: str, state: SyncState) -> None:
     file_path.parent.mkdir(parents=True, exist_ok=True)
     payload = {
         "time_window": state.time_window,
-        "events": {
-            key: {"hash": entry.hash, "updated_at": entry.updated_at}
-            for key, entry in state.events.items()
-        },
+        "events": {key: {"hash": entry.hash, "updated_at": entry.updated_at} for key, entry in state.events.items()},
     }
     with file_path.open("w", encoding="utf-8") as handle:
         json.dump(payload, handle, ensure_ascii=False, indent=2)

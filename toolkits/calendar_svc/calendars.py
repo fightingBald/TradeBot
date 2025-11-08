@@ -4,8 +4,9 @@ from __future__ import annotations
 
 import os
 import uuid
-from datetime import datetime, timedelta, timezone
-from typing import Dict, Optional, Sequence
+from collections.abc import Sequence
+from dataclasses import dataclass
+from datetime import UTC, datetime, timedelta
 from zoneinfo import ZoneInfo
 
 from .defaults import DEFAULT_EVENT_DURATION_MINUTES, DEFAULT_TARGET_TIMEZONE
@@ -15,14 +16,21 @@ from .logging_utils import get_logger
 logger = get_logger()
 
 
+@dataclass(slots=True)
+class GoogleCalendarConfig:
+    """Configuration required to insert events into Google Calendar."""
+
+    calendar_id: str | None = "primary"
+    creds_path: str = "credentials.json"
+    token_path: str = "token.json"
+    calendar_name: str | None = None
+    create_if_missing: bool = False
+    target_timezone: str = DEFAULT_TARGET_TIMEZONE
+    default_duration_minutes: int = DEFAULT_EVENT_DURATION_MINUTES
+
+
 def _ics_escape(text: str) -> str:
-    return (
-        (text or "")
-        .replace("\\", "\\\\")
-        .replace(";", "\\;")
-        .replace(",", "\\,")
-        .replace("\n", "\\n")
-    )
+    return (text or "").replace("\\", "\\\\").replace(";", "\\;").replace(",", "\\,").replace("\n", "\\n")
 
 
 def build_ics(
@@ -32,22 +40,14 @@ def build_ics(
     target_timezone: str = DEFAULT_TARGET_TIMEZONE,
     default_duration_minutes: int = DEFAULT_EVENT_DURATION_MINUTES,
 ) -> str:
-    now = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    now = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
     tz = ZoneInfo(target_timezone)
-    lines = [
-        "BEGIN:VCALENDAR",
-        "VERSION:2.0",
-        f"PRODID:{prodid}",
-        "CALSCALE:GREGORIAN",
-        "METHOD:PUBLISH",
-    ]
+    lines = ["BEGIN:VCALENDAR", "VERSION:2.0", f"PRODID:{prodid}", "CALSCALE:GREGORIAN", "METHOD:PUBLISH"]
     for event in events:
         uid = f"{uuid.uuid4()}@earnings"
         if event.start_at:
             start_local = event.start_at.astimezone(tz)
-            end_source = event.end_at or (
-                event.start_at + timedelta(minutes=default_duration_minutes)
-            )
+            end_source = event.end_at or (event.start_at + timedelta(minutes=default_duration_minutes))
             end_local = end_source.astimezone(tz)
             lines.extend(
                 [
@@ -123,12 +123,7 @@ def _get_google_service(creds_path: str, token_path: str):
     return build("calendar", "v3", credentials=creds)
 
 
-def _ensure_calendar(
-    service,
-    calendar_id: str | None,
-    calendar_name: str | None,
-    create_if_missing: bool,
-) -> str:
+def _ensure_calendar(service, calendar_id: str | None, calendar_name: str | None, create_if_missing: bool) -> str:
     if calendar_id:
         return calendar_id
 
@@ -136,13 +131,9 @@ def _ensure_calendar(
         return "primary"
 
     calendar_name_lower = calendar_name.lower()
-    page_token: Optional[str] = None
+    page_token: str | None = None
     while True:
-        response = (
-            service.calendarList()
-            .list(pageToken=page_token, showDeleted=False, maxResults=250)
-            .execute()
-        )
+        response = service.calendarList().list(pageToken=page_token, showDeleted=False, maxResults=250).execute()
         for item in response.get("items", []):
             summary = item.get("summary") or ""
             if summary.lower() == calendar_name_lower:
@@ -153,9 +144,7 @@ def _ensure_calendar(
             break
 
     if not create_if_missing:
-        raise RuntimeError(
-            f"未找到名为 {calendar_name} 的 Google 日历，且未开启自动创建"
-        )
+        raise RuntimeError(f"未找到名为 {calendar_name} 的 Google 日历，且未开启自动创建")
 
     logger.info("创建新的 Google 日历：%s", calendar_name)
     created = service.calendars().insert(body={"summary": calendar_name}).execute()
@@ -169,23 +158,20 @@ def _earnings_key(event: EarningsEvent) -> str:
 def _build_google_event_body(
     event: EarningsEvent,
     *,
-    start_local: Optional[datetime],
-    end_local: Optional[datetime],
+    start_local: datetime | None,
+    end_local: datetime | None,
     target_tz: ZoneInfo,
     default_duration_minutes: int,
-) -> Dict[str, object]:
+) -> dict[str, object]:
     end_date = event.date + timedelta(days=1)
     key = _earnings_key(event)
-    body: Dict[str, object] = {
+    body: dict[str, object] = {
         "summary": event.summary(),
         "description": event.description(),
         "transparency": "transparent",
         "reminders": {
             "useDefault": False,
-            "overrides": [
-                {"method": "popup", "minutes": 24 * 60},
-                {"method": "popup", "minutes": 120},
-            ],
+            "overrides": [{"method": "popup", "minutes": 24 * 60}, {"method": "popup", "minutes": 120}],
         },
         "extendedProperties": {
             "private": {
@@ -196,9 +182,7 @@ def _build_google_event_body(
         },
     }
     if start_local:
-        end_local = end_local or (
-            start_local + timedelta(minutes=default_duration_minutes)
-        )
+        end_local = end_local or (start_local + timedelta(minutes=default_duration_minutes))
         body["start"] = {"dateTime": start_local.isoformat(), "timeZone": target_tz.key}
         body["end"] = {"dateTime": end_local.isoformat(), "timeZone": target_tz.key}
     else:
@@ -209,31 +193,18 @@ def _build_google_event_body(
     return body
 
 
-def google_insert(
-    events: Sequence[EarningsEvent],
-    calendar_id: str | None = "primary",
-    creds_path: str = "credentials.json",
-    token_path: str = "token.json",
-    *,
-    calendar_name: str | None = None,
-    create_if_missing: bool = False,
-    target_timezone: str = DEFAULT_TARGET_TIMEZONE,
-    default_duration_minutes: int = DEFAULT_EVENT_DURATION_MINUTES,
-) -> str:
+def google_insert(events: Sequence[EarningsEvent], config: GoogleCalendarConfig | None = None) -> str:
     """Insert or update earnings events into Google Calendar."""
 
-    service = _get_google_service(creds_path, token_path)
-    target_calendar_id = _ensure_calendar(
-        service, calendar_id, calendar_name, create_if_missing
-    )
-    target_tz = ZoneInfo(target_timezone)
+    cfg = config or GoogleCalendarConfig()
+    service = _get_google_service(cfg.creds_path, cfg.token_path)
+    target_calendar_id = _ensure_calendar(service, cfg.calendar_id, cfg.calendar_name, cfg.create_if_missing)
+    target_tz = ZoneInfo(cfg.target_timezone)
 
     for event in events:
         key = _earnings_key(event)
         if event.start_at:
-            end_source = event.end_at or (
-                event.start_at + timedelta(minutes=default_duration_minutes)
-            )
+            end_source = event.end_at or (event.start_at + timedelta(minutes=cfg.default_duration_minutes))
             start_local = event.start_at.astimezone(target_tz)
             end_local = end_source.astimezone(target_tz)
         else:
@@ -245,7 +216,7 @@ def google_insert(
             start_local=start_local,
             end_local=end_local,
             target_tz=target_tz,
-            default_duration_minutes=default_duration_minutes,
+            default_duration_minutes=cfg.default_duration_minutes,
         )
 
         existing = (
@@ -261,35 +232,19 @@ def google_insert(
         items = existing.get("items", [])
         if items:
             event_id = items[0]["id"]
-            service.events().update(
-                calendarId=target_calendar_id,
-                eventId=event_id,
-                body=event_body,
-            ).execute()
+            service.events().update(calendarId=target_calendar_id, eventId=event_id, body=event_body).execute()
             logger.debug(
-                "更新 Google Calendar 事件：calendarId=%s eventId=%s key=%s",
-                target_calendar_id,
-                event_id,
-                key,
+                "更新 Google Calendar 事件：calendarId=%s eventId=%s key=%s", target_calendar_id, event_id, key
             )
         else:
-            service.events().insert(
-                calendarId=target_calendar_id, body=event_body
-            ).execute()
-            logger.debug(
-                "创建 Google Calendar 事件：calendarId=%s key=%s",
-                target_calendar_id,
-                key,
-            )
+            service.events().insert(calendarId=target_calendar_id, body=event_body).execute()
+            logger.debug("创建 Google Calendar 事件：calendarId=%s key=%s", target_calendar_id, key)
 
     return target_calendar_id
 
 
 def icloud_caldav_insert(
-    events: Sequence[EarningsEvent],
-    apple_id: str,
-    app_password: str,
-    calendar_name: str = "Earnings",
+    events: Sequence[EarningsEvent], apple_id: str, app_password: str, calendar_name: str = "Earnings"
 ) -> None:
     """
     需要 Apple app-specific password（非你的登录密码）。iCloud CalDAV 主机 caldav.icloud.com。
@@ -297,9 +252,7 @@ def icloud_caldav_insert(
     """
     from caldav import DAVClient
 
-    client = DAVClient(
-        url="https://caldav.icloud.com/", username=apple_id, password=app_password
-    )
+    client = DAVClient(url="https://caldav.icloud.com/", username=apple_id, password=app_password)
     principal = client.principal()
     calendars = principal.calendars()
     target = None

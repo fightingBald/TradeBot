@@ -11,8 +11,6 @@ from toolkits.calendar_svc import (
     DEFAULT_SESSION_TIMES,
     DEFAULT_SOURCE_TIMEZONE,
     DEFAULT_TARGET_TIMEZONE,
-)
-from toolkits.calendar_svc import (
     RuntimeOptions,
     build_runtime_options,
     load_config,
@@ -29,9 +27,7 @@ def test_parse_symbols_normalizes_and_deduplicates():
 
 def test_load_env_file_populates_environment(tmp_path, monkeypatch):
     env_file = tmp_path / ".env"
-    env_file.write_text(
-        "NEW_VAR=value\nEXISTING=should_not_override\n", encoding="utf-8"
-    )
+    env_file.write_text("NEW_VAR=value\nEXISTING=should_not_override\n", encoding="utf-8")
     monkeypatch.setenv("EXISTING", "keep")
     monkeypatch.delenv("NEW_VAR", raising=False)
 
@@ -151,12 +147,7 @@ def test_build_runtime_options_merges_config(tmp_path, monkeypatch):
 
     project_root = Path(tmp_path)
 
-    options = build_runtime_options(
-        parsed,
-        config,
-        config_base=None,
-        project_root=project_root,
-    )
+    options = build_runtime_options(parsed, config, config_base=None, project_root=project_root)
 
     assert isinstance(options, RuntimeOptions)
     assert options.symbols == ["AAPL", "MSFT"]
@@ -187,12 +178,7 @@ def test_build_runtime_options_merges_config(tmp_path, monkeypatch):
 def test_build_runtime_options_cli_overrides_config(tmp_path, monkeypatch):
     _clear_env(monkeypatch)
 
-    config = {
-        "symbols": ["AAPL"],
-        "source": "finnhub",
-        "days": 30,
-        "google_credentials": "cfg.json",
-    }
+    config = {"symbols": ["AAPL"], "source": "finnhub", "days": 30, "google_credentials": "cfg.json"}
 
     parsed = SimpleNamespace(
         symbols="TSLA, msft",
@@ -222,12 +208,7 @@ def test_build_runtime_options_cli_overrides_config(tmp_path, monkeypatch):
 
     project_root = Path(tmp_path)
 
-    options = build_runtime_options(
-        parsed,
-        config,
-        config_base=None,
-        project_root=project_root,
-    )
+    options = build_runtime_options(parsed, config, config_base=None, project_root=project_root)
 
     assert options.symbols == ["TSLA", "MSFT"]
     assert options.source == "fmp"
@@ -300,12 +281,7 @@ def test_build_runtime_options_uses_env_defaults(tmp_path, monkeypatch):
     config_base = Path(tmp_path) / "config_dir"
     config_base.mkdir()
 
-    options = build_runtime_options(
-        parsed,
-        {},
-        config_base=config_base,
-        project_root=Path(tmp_path),
-    )
+    options = build_runtime_options(parsed, {}, config_base=config_base, project_root=Path(tmp_path))
 
     assert options.symbols == ["TSLA"]
     assert options.source == "fmp"
@@ -370,12 +346,7 @@ def test_build_runtime_options_resolves_paths_relative_to_config(tmp_path, monke
         sync_state_path=None,
     )
 
-    options = build_runtime_options(
-        parsed,
-        config,
-        config_base=config_base,
-        project_root=tmp_path,
-    )
+    options = build_runtime_options(parsed, config, config_base=config_base, project_root=tmp_path)
 
     assert options.google_credentials == str(config_base / "secrets/credentials.json")
     assert options.google_token == str(config_base / "secrets/token.json")
@@ -421,9 +392,4 @@ def test_build_runtime_options_rejects_non_benzinga(tmp_path, monkeypatch):
     )
 
     with pytest.raises(ValueError):
-        build_runtime_options(
-            parsed,
-            config,
-            config_base=None,
-            project_root=Path(tmp_path),
-        )
+        build_runtime_options(parsed, config, config_base=None, project_root=Path(tmp_path))

@@ -5,7 +5,6 @@ from datetime import date
 
 import pytest
 
-from toolkits.ark.holdings import Holding, HoldingSnapshot, diff_snapshots
 from py_scripts.ark_holdings.daily_pipeline import (
     _build_etf_report,
     _build_global_summary,
@@ -14,6 +13,7 @@ from py_scripts.ark_holdings.daily_pipeline import (
     _sanitize_email_environment,
     change_to_dict,
 )
+from toolkits.ark.holdings import Holding, HoldingSnapshot, diff_snapshots
 
 
 @pytest.fixture()
@@ -67,9 +67,7 @@ def current_snapshot() -> HoldingSnapshot:
 
 
 def test_change_to_dict_contains_abs_fields(baseline_snapshot, current_snapshot):
-    changes = diff_snapshots(
-        baseline_snapshot, current_snapshot, weight_threshold=0.0, share_threshold=0.0
-    )
+    changes = diff_snapshots(baseline_snapshot, current_snapshot, weight_threshold=0.0, share_threshold=0.0)
     assert changes, "expected at least one change"
     payload = change_to_dict(changes[0])
     assert "weight_change_abs" in payload
@@ -79,16 +77,10 @@ def test_change_to_dict_contains_abs_fields(baseline_snapshot, current_snapshot)
 
 
 def test_render_email_html_orders_sections(baseline_snapshot, current_snapshot):
-    changes = diff_snapshots(
-        baseline_snapshot, current_snapshot, weight_threshold=0.0, share_threshold=0.0
-    )
-    report = _build_etf_report(
-        "ARKK", baseline_snapshot, current_snapshot, changes, top_n=5
-    )
+    changes = diff_snapshots(baseline_snapshot, current_snapshot, weight_threshold=0.0, share_threshold=0.0)
+    report = _build_etf_report("ARKK", baseline_snapshot, current_snapshot, changes, top_n=5)
     summary = _build_global_summary([report])
-    html_body = _render_email_html(
-        [report], {"ARKK": current_snapshot}, holdings_limit=10, global_summary=summary
-    )
+    html_body = _render_email_html([report], {"ARKK": current_snapshot}, holdings_limit=10, global_summary=summary)
 
     # Expect key elements present
     assert "<h2>ARKK</h2>" in html_body

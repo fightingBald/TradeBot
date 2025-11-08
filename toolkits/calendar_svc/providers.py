@@ -2,20 +2,15 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable, Sequence
 from datetime import date, datetime, time, timedelta
-from typing import Callable, Dict, List, Sequence
 from zoneinfo import ZoneInfo
 
 import httpx
 import numpy as np
 import pandas as pd
 
-from .defaults import (
-    DEFAULT_EVENT_DURATION_MINUTES,
-    DEFAULT_SESSION_TIMES,
-    DEFAULT_TIMEOUT_SECONDS,
-    USER_AGENT,
-)
+from .defaults import DEFAULT_EVENT_DURATION_MINUTES, DEFAULT_SESSION_TIMES, DEFAULT_TIMEOUT_SECONDS, USER_AGENT
 from .domain import EarningsEvent
 from .logging_utils import get_logger
 
@@ -32,7 +27,7 @@ class EarningsDataProvider:
         api_key: str | None,
         *,
         source_timezone: str,
-        session_times: Dict[str, str] | None = None,
+        session_times: dict[str, str] | None = None,
         event_duration_minutes: int = DEFAULT_EVENT_DURATION_MINUTES,
     ) -> None:
         if not api_key:
@@ -49,9 +44,7 @@ class EarningsDataProvider:
 
     def _get(self, url: str) -> httpx.Response:
         logger.debug("HTTP GET %s", url)
-        response = httpx.get(
-            url, headers={"User-Agent": USER_AGENT}, timeout=DEFAULT_TIMEOUT_SECONDS
-        )
+        response = httpx.get(url, headers={"User-Agent": USER_AGENT}, timeout=DEFAULT_TIMEOUT_SECONDS)
         response.raise_for_status()
         return response
 
@@ -59,7 +52,7 @@ class EarningsDataProvider:
     def _parse_time_string(value: str | None) -> time | None:
         if not value:
             return None
-        if isinstance(value, (float, np.floating)) and np.isnan(value):
+        if isinstance(value, float | np.floating) and np.isnan(value):
             return None
         text = str(value).strip()
         if not text:
@@ -85,12 +78,7 @@ class EarningsDataProvider:
         end = start + self._event_duration
         return start, end
 
-    def fetch(
-        self,
-        symbols: Sequence[str],
-        start: date,
-        end: date,
-    ) -> List[EarningsEvent]:
+    def fetch(self, symbols: Sequence[str], start: date, end: date) -> list[EarningsEvent]:
         raise NotImplementedError
 
 
@@ -100,12 +88,7 @@ class FmpEarningsProvider(EarningsDataProvider):
     def __init__(self, api_key: str | None, **kwargs) -> None:
         super().__init__(api_key, **kwargs)
 
-    def fetch(
-        self,
-        symbols: Sequence[str],
-        start: date,
-        end: date,
-    ) -> List[EarningsEvent]:
+    def fetch(self, symbols: Sequence[str], start: date, end: date) -> list[EarningsEvent]:
         since_s, until_s = self._format_range(start, end)
         url = (
             "https://financialmodelingprep.com/stable/earnings-calendar"
@@ -145,13 +128,9 @@ class FmpEarningsProvider(EarningsDataProvider):
         df["time"] = df.get("time")
         df["source"] = self.source_name
 
-        events: List[EarningsEvent] = []
-        for row in df[["symbol", "date", "session", "source", "time"]].itertuples(
-            index=False, name="Row"
-        ):
-            start_at, end_at = self._build_datetime(
-                row.date, row.session, getattr(row, "time", None)
-            )
+        events: list[EarningsEvent] = []
+        for row in df[["symbol", "date", "session", "source", "time"]].itertuples(index=False, name="Row"):
+            start_at, end_at = self._build_datetime(row.date, row.session, getattr(row, "time", None))
             events.append(
                 EarningsEvent(
                     symbol=row.symbol,
@@ -173,17 +152,9 @@ class FinnhubEarningsProvider(EarningsDataProvider):
     def __init__(self, api_key: str | None, **kwargs) -> None:
         super().__init__(api_key, **kwargs)
 
-    def fetch(
-        self,
-        symbols: Sequence[str],
-        start: date,
-        end: date,
-    ) -> List[EarningsEvent]:
+    def fetch(self, symbols: Sequence[str], start: date, end: date) -> list[EarningsEvent]:
         since_s, until_s = self._format_range(start, end)
-        url = (
-            "https://finnhub.io/api/v1/calendar/earnings"
-            f"?from={since_s}&to={until_s}&token={self._api_key}"
-        )
+        url = "https://finnhub.io/api/v1/calendar/earnings" f"?from={since_s}&to={until_s}&token={self._api_key}"
         response = self._get(url)
         payload = response.json() or {}
         data = payload.get("earningsCalendar", []) or []
@@ -212,13 +183,9 @@ class FinnhubEarningsProvider(EarningsDataProvider):
         df["hour"] = df.get("hour")
         df["source"] = self.source_name
 
-        events: List[EarningsEvent] = []
-        for row in df[["symbol", "date", "session", "source", "hour"]].itertuples(
-            index=False, name="Row"
-        ):
-            start_at, end_at = self._build_datetime(
-                row.date, row.session, getattr(row, "hour", None)
-            )
+        events: list[EarningsEvent] = []
+        for row in df[["symbol", "date", "session", "source", "hour"]].itertuples(index=False, name="Row"):
+            start_at, end_at = self._build_datetime(row.date, row.session, getattr(row, "hour", None))
             events.append(
                 EarningsEvent(
                     symbol=row.symbol,
@@ -234,7 +201,7 @@ class FinnhubEarningsProvider(EarningsDataProvider):
         return events
 
 
-PROVIDERS: Dict[str, Callable[..., EarningsDataProvider]] = {
+PROVIDERS: dict[str, Callable[..., EarningsDataProvider]] = {
     "fmp": FmpEarningsProvider,
     "finnhub": FinnhubEarningsProvider,
 }

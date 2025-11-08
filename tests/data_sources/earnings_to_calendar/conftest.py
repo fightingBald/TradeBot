@@ -49,10 +49,7 @@ class StubGoogleService:
 
         class CalendarList:
             def list(self, **kwargs):  # noqa: ANN001
-                items = [
-                    {"id": cid, "summary": summary}
-                    for cid, summary in outer.calendars_data.items()
-                ]
+                items = [{"id": cid, "summary": summary} for cid, summary in outer.calendars_data.items()]
                 return StubExecute({"items": items})
 
         return CalendarList()
@@ -81,10 +78,7 @@ class StubGoogleService:
                 matches = [
                     evt
                     for evt in outer.events_data.get(calendarId, [])
-                    if evt.get("extendedProperties", {})
-                    .get("private", {})
-                    .get("earnings_key")
-                    == key
+                    if evt.get("extendedProperties", {}).get("private", {}).get("earnings_key") == key
                 ]
                 return StubExecute({"items": matches})
 

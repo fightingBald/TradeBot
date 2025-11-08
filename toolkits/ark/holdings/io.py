@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Mapping
 from math import isnan
 from pathlib import Path
-from typing import Mapping
 
 import pandas as pd
 
@@ -32,9 +32,7 @@ def snapshot_to_dataframe(snapshot: HoldingSnapshot) -> pd.DataFrame:
     ]
     df = pd.DataFrame(rows)
     if df.empty:
-        logger.warning(
-            "Snapshot for %s on %s contains no holdings.", snapshot.etf, snapshot.as_of
-        )
+        logger.warning("Snapshot for %s on %s contains no holdings.", snapshot.etf, snapshot.as_of)
     return df
 
 
@@ -87,9 +85,7 @@ def write_snapshot_csv(snapshot: HoldingSnapshot, path: str | Path) -> None:
     logger.debug("Wrote snapshot csv: %s (rows=%d)", csv_path, len(df))
 
 
-def snapshot_collection_to_folder(
-    snapshots: Mapping[str, HoldingSnapshot], folder: str | Path
-) -> None:
+def snapshot_collection_to_folder(snapshots: Mapping[str, HoldingSnapshot], folder: str | Path) -> None:
     """Persist a mapping of ETF -> snapshot into a folder of CSV files."""
     target = Path(folder)
     target.mkdir(parents=True, exist_ok=True)
@@ -117,16 +113,15 @@ def _maybe_float(value: object) -> float | None:
     if value is None:
         return None
     if isinstance(value, float):
-        if isnan(value):
+        return None if isnan(value) else value
+    candidate = value
+    if isinstance(value, str):
+        candidate = value.strip()
+        if not candidate:
             return None
-        return value
-    if isinstance(value, int):
-        return float(value)
-    if isinstance(value, str) and not value.strip():
-        return None
     try:
-        return float(value)
-    except Exception:
+        return float(candidate)
+    except (TypeError, ValueError):
         return None
 
 

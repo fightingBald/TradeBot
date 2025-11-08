@@ -2,8 +2,7 @@ from datetime import date
 
 import pytest
 
-from toolkits.calendar_svc import fetch_macro_events
-from toolkits.calendar_svc import RuntimeOptions
+from toolkits.calendar_svc import RuntimeOptions, fetch_macro_events
 
 
 class _Response:
@@ -99,9 +98,7 @@ def test_fetch_macro_events_includes_high_importance_events(monkeypatch):
     assert fomc.source == "Benzinga-Economic"
     assert fomc.session == "FOMC"
     assert "Importance: 4" in fomc.notes
-    housing = next(
-        evt for evt in events if evt.symbol.startswith("MACRO-HOUSING-STARTS")
-    )
+    housing = next(evt for evt in events if evt.symbol.startswith("MACRO-HOUSING-STARTS"))
     assert housing.session == "HOUSING"
 
 
@@ -136,10 +133,7 @@ def test_fetch_macro_events_handles_results_key(monkeypatch):
         ]
     }
 
-    monkeypatch.setattr(
-        "toolkits.calendar_svc.macro_events._http_get",
-        lambda params: _Response(payload),
-    )
+    monkeypatch.setattr("toolkits.calendar_svc.macro_events._http_get", lambda params: _Response(payload))
 
     options = _base_options()
     events = fetch_macro_events(date(2024, 8, 1), date(2024, 8, 31), options)

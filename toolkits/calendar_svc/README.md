@@ -117,6 +117,22 @@ for event in macros:
     print(event.summary(), event.notes)
 ```
 
+若只想把手头的 `EarningsEvent` 写进 Google Calendar，可以直接使用
+`GoogleCalendarConfig`：
+
+```python
+from toolkits.calendar_svc import GoogleCalendarConfig, google_insert
+
+config = GoogleCalendarConfig(
+    calendar_name="Company Earnings",
+    create_if_missing=True,
+    creds_path="secrets/credentials.json",
+    token_path="secrets/token.json",
+)
+calendar_id = google_insert(events, config=config)
+print("Inserted events into", calendar_id)
+```
+
 ## 依赖注入与运行环境
 
 - HTTP 请求依赖外部 `FMP_API_KEY`、`FINNHUB_API_KEY`、`BENZINGA_API_KEY` 等环境变量。

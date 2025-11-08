@@ -4,17 +4,14 @@ from __future__ import annotations
 
 import os
 import re
+from collections.abc import Mapping
 from datetime import date, datetime, time as dt_time, timedelta
-from typing import Any, List, Mapping
+from typing import Any
 from zoneinfo import ZoneInfo
 
 import requests
 
-from .defaults import (
-    DEFAULT_EVENT_DURATION_MINUTES,
-    DEFAULT_TIMEOUT_SECONDS,
-    USER_AGENT,
-)
+from .defaults import DEFAULT_EVENT_DURATION_MINUTES, DEFAULT_TIMEOUT_SECONDS, USER_AGENT
 from .domain import EarningsEvent
 from .logging_utils import get_logger
 from .settings import RuntimeOptions
@@ -32,7 +29,7 @@ def _require_api_key(env_var: str, provider_name: str) -> str:
     return api_key
 
 
-def _extract_items(payload: Any) -> List[Mapping[str, Any]]:
+def _extract_items(payload: Any) -> list[Mapping[str, Any]]:
     if isinstance(payload, list):
         return [item for item in payload if isinstance(item, Mapping)]
     if isinstance(payload, Mapping):
@@ -61,9 +58,7 @@ def _parse_time_value(value: Any) -> dt_time | None:
     return None
 
 
-def _parse_event_datetime(
-    item: Mapping[str, Any], tz: ZoneInfo
-) -> tuple[date | None, datetime | None]:
+def _parse_event_datetime(item: Mapping[str, Any], tz: ZoneInfo) -> tuple[date | None, datetime | None]:
     raw_date = item.get("date") or item.get("event_date")
     if not raw_date:
         return None, None
@@ -85,11 +80,7 @@ def _build_notes(item: Mapping[str, Any]) -> str:
         text = item.get(key)
         if text:
             fields.append(str(text).strip())
-    for key, label in (
-        ("actual", "Actual"),
-        ("consensus", "Consensus"),
-        ("previous", "Previous"),
-    ):
+    for key, label in (("actual", "Actual"), ("consensus", "Consensus"), ("previous", "Previous")):
         value = item.get(key)
         if value not in (None, ""):
             fields.append(f"{label}: {value}")
@@ -108,9 +99,7 @@ def _http_get(params: Mapping[str, Any]) -> requests.Response:
     )
 
 
-def fetch_macro_events(
-    start: date, end: date, options: RuntimeOptions
-) -> List[EarningsEvent]:
+def fetch_macro_events(start: date, end: date, options: RuntimeOptions) -> list[EarningsEvent]:
     api_key = _require_api_key("BENZINGA_API_KEY", "Benzinga")
 
     params = {
@@ -128,10 +117,8 @@ def fetch_macro_events(
     items = _extract_items(response.json())
 
     tz = ZoneInfo(options.source_timezone)
-    duration = timedelta(
-        minutes=options.event_duration_minutes or DEFAULT_EVENT_DURATION_MINUTES
-    )
-    events: List[EarningsEvent] = []
+    duration = timedelta(minutes=options.event_duration_minutes or DEFAULT_EVENT_DURATION_MINUTES)
+    events: list[EarningsEvent] = []
 
     for item in items:
         event_name = str(item.get("event_name") or item.get("event") or "").strip()

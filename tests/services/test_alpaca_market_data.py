@@ -1,5 +1,5 @@
 from decimal import Decimal
-from typing import Any, Dict, List
+from typing import Any
 
 import pytest
 
@@ -7,7 +7,7 @@ from app.config import Settings
 from app.services.alpaca_market_data import AlpacaMarketDataService
 
 
-def _position_payload(symbol: str, quantity_key: str = "qty") -> Dict[str, Any]:
+def _position_payload(symbol: str, quantity_key: str = "qty") -> dict[str, Any]:
     quantity_value = "10" if symbol == "MSFT" else "5"
     payload = {
         "symbol": symbol,
@@ -31,39 +31,34 @@ def _position_payload(symbol: str, quantity_key: str = "qty") -> Dict[str, Any]:
 class DummyTradingClient:
     def __init__(self, **kwargs: Any) -> None:
         self.kwargs = kwargs
-        self._positions: List[Any] = []
+        self._positions: list[Any] = []
 
-    def with_positions(self, positions: List[Any]) -> "DummyTradingClient":
+    def with_positions(self, positions: list[Any]) -> "DummyTradingClient":
         self._positions = positions
         return self
 
-    def get_all_positions(self) -> List[Any]:
+    def get_all_positions(self) -> list[Any]:
         return self._positions
 
 
 def test_get_user_positions_converts_sdk_models(monkeypatch) -> None:
-    created_clients: List[DummyTradingClient] = []
+    created_clients: list[DummyTradingClient] = []
 
     def fake_trading_client(**kwargs: Any) -> DummyTradingClient:
         client = DummyTradingClient(**kwargs).with_positions(
-            [
-                DummySDKPosition(_position_payload("AAPL")),
-                _position_payload("MSFT", quantity_key="quantity"),
-            ]
+            [DummySDKPosition(_position_payload("AAPL")), _position_payload("MSFT", quantity_key="quantity")]
         )
         created_clients.append(client)
         return client
 
     class DummySDKPosition:
-        def __init__(self, payload: Dict[str, Any]) -> None:
+        def __init__(self, payload: dict[str, Any]) -> None:
             self._payload = payload
 
-        def model_dump(self) -> Dict[str, Any]:
+        def model_dump(self) -> dict[str, Any]:
             return self._payload
 
-    monkeypatch.setattr(
-        "app.services.alpaca_market_data.TradingClient", fake_trading_client
-    )
+    monkeypatch.setattr("app.services.alpaca_market_data.TradingClient", fake_trading_client)
     monkeypatch.setenv("ALPACA_API_KEY", "key")
     monkeypatch.setenv("ALPACA_API_SECRET", "secret")
     monkeypatch.setenv("ALPACA_TRADING_BASE_URL", "https://paper-api.alpaca.markets")
@@ -94,12 +89,10 @@ def test_get_user_positions_wraps_api_errors(monkeypatch) -> None:
         def __init__(self, **_: Any) -> None:
             pass
 
-        def get_all_positions(self) -> List[Any]:
+        def get_all_positions(self) -> list[Any]:
             raise DummyAPIError("boom")
 
-    monkeypatch.setattr(
-        "app.services.alpaca_market_data.TradingClient", DummyTradingClient
-    )
+    monkeypatch.setattr("app.services.alpaca_market_data.TradingClient", DummyTradingClient)
     monkeypatch.setattr("app.services.alpaca_market_data.APIError", DummyAPIError)
     monkeypatch.setenv("ALPACA_API_KEY", "key")
     monkeypatch.setenv("ALPACA_API_SECRET", "secret")

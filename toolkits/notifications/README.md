@@ -19,37 +19,47 @@
 2. 代码里这样用：
 
    ```python
-from toolkits.notifications import EmailNotificationService, EmailSettings
+from toolkits.notifications import (
+    EmailNotificationService,
+    EmailRecipients,
+    EmailSettings,
+    load_recipient_config,
+)
 
-   settings = EmailSettings()          # 自动读取 EMAIL_* 配置
-   mailer = EmailNotificationService(settings)
+settings = EmailSettings()          # 自动读取 EMAIL_* 配置
+mailer = EmailNotificationService(settings)
+recipient_cfg = load_recipient_config()
 
-   mailer.send_email(
-       subject="策略告警",
-       body="今天的策略触发啦，快来看看。",
-       recipients=load_recipient_config().to,  # 也可直接写 list
-   )
+mailer.send_email(
+    subject="策略告警",
+    body="今天的策略触发啦，快来看看。",
+    recipients=EmailRecipients(to=recipient_cfg.to),
+)
    ```
 
    如果想发 HTML、CC/BCC 或带附件，也可以：
 
    ```python
-from toolkits.notifications import EmailAttachment
+from toolkits.notifications import EmailAttachment, EmailMessageOptions, EmailRecipients
 
-   mailer.send_email(
-       subject="每日盈亏汇总",
-       body="<h1>Summary</h1><p>今日+3.2%</p>",
-       subtype="html",
-       recipients=["boss@example.com"],
-       cc=["team@example.com"],
-       attachments=[
-           EmailAttachment(
-               filename="report.csv",
-               content=b"symbol,pnl\nAAPL,2300\n",
-               mimetype="text/csv",
-           )
-       ],
-   )
+mailer.send_email(
+    subject="每日盈亏汇总",
+    body="<h1>Summary</h1><p>今日+3.2%</p>",
+    recipients=EmailRecipients(
+        to=["boss@example.com"],
+        cc=["team@example.com"],
+    ),
+    options=EmailMessageOptions(
+        subtype="html",
+        attachments=[
+            EmailAttachment(
+                filename="report.csv",
+                content=b"symbol,pnl\nAAPL,2300\n",
+                mimetype="text/csv",
+            )
+        ],
+    ),
+)
    ```
 
 ## 2. 配置说明

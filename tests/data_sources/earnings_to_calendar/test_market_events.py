@@ -1,8 +1,7 @@
 from datetime import date, datetime
 from zoneinfo import ZoneInfo
 
-from toolkits.calendar_svc import generate_market_events
-from toolkits.calendar_svc import RuntimeOptions
+from toolkits.calendar_svc import RuntimeOptions, generate_market_events
 
 
 def test_generate_market_events():
@@ -34,12 +33,7 @@ def test_generate_market_events():
     events = generate_market_events(date(2024, 3, 1), date(2024, 3, 31), options)
     assert len(events) == 4
     kinds = {e.symbol: e for e in events}
-    assert set(kinds) == {
-        "MARKET-OPEX",
-        "MARKET-FOUR-WITCHES",
-        "MARKET-VIX-OPTIONS",
-        "MARKET-VIX-FUTURES",
-    }
+    assert set(kinds) == {"MARKET-OPEX", "MARKET-FOUR-WITCHES", "MARKET-VIX-OPTIONS", "MARKET-VIX-FUTURES"}
     ny = ZoneInfo("America/New_York")
     assert kinds["MARKET-OPEX"].start_at == datetime(2024, 3, 15, 9, 30, tzinfo=ny)
     assert kinds["MARKET-VIX-OPTIONS"].start_at.date() == date(2024, 3, 20)

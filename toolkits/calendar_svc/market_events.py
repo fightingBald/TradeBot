@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from datetime import date, datetime, time, timedelta
-from typing import Iterable, List
 from zoneinfo import ZoneInfo
 
 from .domain import EarningsEvent
 from .settings import RuntimeOptions
+
+MONTHS_PER_YEAR = 12
 
 
 def _nth_weekday(year: int, month: int, weekday: int) -> date | None:
@@ -23,21 +25,19 @@ def _month_range(start: date, end: date) -> Iterable[tuple[int, int]]:
     year, month = start.year, start.month
     while date(year, month, 1) <= date(end.year, end.month, 1):
         yield year, month
-        if month == 12:
+        if month == MONTHS_PER_YEAR:
             year += 1
             month = 1
         else:
             month += 1
 
 
-def generate_market_events(
-    start: date, end: date, options: RuntimeOptions
-) -> List[EarningsEvent]:
+def generate_market_events(start: date, end: date, options: RuntimeOptions) -> list[EarningsEvent]:
     """生成四巫日 / OPEX / VIX 结算等市场事件。"""
     tz = ZoneInfo(options.source_timezone)
     duration = timedelta(minutes=options.event_duration_minutes)
     default_time = time(9, 30)
-    events: List[EarningsEvent] = []
+    events: list[EarningsEvent] = []
 
     def add_event(event_date: date, symbol: str, title: str, notes: str) -> None:
         if event_date < start or event_date > end:
@@ -61,10 +61,7 @@ def generate_market_events(
         third_friday = _nth_weekday(year, month, 4)
         if third_friday:
             add_event(
-                third_friday,
-                symbol="MARKET-OPEX",
-                title="OPEX",
-                notes="Monthly options expiration (third Friday)",
+                third_friday, symbol="MARKET-OPEX", title="OPEX", notes="Monthly options expiration (third Friday)"
             )
             if month in {3, 6, 9, 12}:
                 add_event(

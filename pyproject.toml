@@ -1,0 +1,50 @@
+[project]
+name = "AlpacaTrading"
+version = "0.1.0"
+requires-python = ">=3.13"
+
+[tool.ruff]
+target-version = "py313"
+line-length = 120
+
+[tool.ruff.lint]
+# 开启 Ruff 作为 linter（默认开启）
+select = [
+    "E", "F",        # pycodestyle/pyflakes 基础
+    "W",             # 警告类
+    "UP",            # pyupgrade（自动现代化语法）
+    "I",             # import 排序（替代 isort）
+    "B",             # bugbear（潜在 bug）
+    "PL",            # pylint 子集（有用但不过度）
+    "RUF",           # ruff 自有规则
+]
+# 关键：全局忽略（放过）
+ignore = [
+    "E501",   # 长行
+    "RUF001", # 全角标点（字符串里）
+    "RUF002", # Docstring 中的全角标点
+    "RUF100", # 多余的 noqa
+    # 如果连导入未排序也想放过，再加上：
+    # "I001",
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*" = ["PLR", "S101"]  # 例：测试里允许一些命名/print
+"**/__init__.py" = ["F401"]     # 允许包内导出未使用
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = true
+line-ending = "lf"
+docstring-code-format = true
+
+[tool.ruff.lint.isort]
+known-first-party = ["app", "toolkits", "py_scripts", "tests"]
+combine-as-imports = true
+split-on-trailing-comma = false
+
+[tool.pytest.ini_options]
+addopts = "-q"
+testpaths = ["tests"]
+filterwarnings = ["error::DeprecationWarning"]

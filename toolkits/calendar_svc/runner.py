@@ -4,38 +4,40 @@ from __future__ import annotations
 
 import os
 import sys
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import date, datetime, time, timedelta
-from typing import List, Sequence
 from zoneinfo import ZoneInfo
 
-from .calendars import build_ics, google_insert, icloud_caldav_insert
+from .calendars import GoogleCalendarConfig, build_ics, google_insert, icloud_caldav_insert
 from .domain import EarningsEvent, deduplicate_events
 from .logging_utils import get_logger
 from .macro_events import fetch_macro_events
 from .market_events import generate_market_events
 from .providers import PROVIDERS, EarningsDataProvider
 from .settings import RuntimeOptions
-from .sync_state import (
-    SyncDiff,
-    build_sync_state,
-    diff_events,
-    load_sync_state,
-    save_sync_state,
-)
+from .sync_state import SyncDiff, build_sync_state, diff_events, load_sync_state, save_sync_state
 
 logger = get_logger()
 
 
-@dataclass
+@dataclass(slots=True)
 class RunSummary:
     since: date
     until: date
-    events: List[EarningsEvent]
+    events: list[EarningsEvent]
     google_calendar_id: str | None = None
     ics_path: str | None = None
     icloud_calendar_name: str | None = None
     sync_stats: dict[str, int] | None = None
+
+
+@dataclass(slots=True)
+class DateWindow:
+    """Inclusive date range for the pipeline run."""
+
+    since: date
+    until: date
 
 
 def _resolve_provider(options: RuntimeOptions) -> EarningsDataProvider:
@@ -56,19 +58,10 @@ def _resolve_provider(options: RuntimeOptions) -> EarningsDataProvider:
     )
 
 
-def collect_events(
-    options: RuntimeOptions,
-    *,
-    since: date,
-    until: date,
-) -> List[EarningsEvent]:
+def collect_events(options: RuntimeOptions, *, since: date, until: date) -> list[EarningsEvent]:
     provider = _resolve_provider(options)
     logger.info(
-        "开始拉取数据：source=%s symbols=%s 窗口=%s~%s",
-        options.source,
-        ",".join(options.symbols),
-        since,
-        until,
+        "开始拉取数据：source=%s symbols=%s 窗口=%s~%s", options.source, ",".join(options.symbols), since, until
     )
     events = provider.fetch(options.symbols, since, until)
     if options.market_events:
@@ -90,9 +83,7 @@ def collect_events(
     return unique_events
 
 
-def _format_google_event_lines(
-    events: Sequence[EarningsEvent], options: RuntimeOptions
-) -> str:
+def _format_google_event_lines(events: Sequence[EarningsEvent], options: RuntimeOptions) -> str:
     fallback_tz = ZoneInfo(options.target_timezone)
 
     def _event_sort_key(item: EarningsEvent) -> tuple[date, datetime, str]:
@@ -110,22 +101,14 @@ def apply_outputs(
     events: Sequence[EarningsEvent],
     options: RuntimeOptions,
     *,
-    since: date,
-    until: date,
+    window: DateWindow,
     events_for_google: Sequence[EarningsEvent],
     sync_diff: SyncDiff | None = None,
 ) -> RunSummary:
-    summary = RunSummary(
-        since=since,
-        until=until,
-        events=list(events),
-    )
+    summary = RunSummary(since=window.since, until=window.until, events=list(events))
 
     if not events:
-        print(
-            "没拉到任何财报日。检查 API Key、代码是否美股、日期范围或数据源限额。",
-            file=sys.stderr,
-        )
+        print("没拉到任何财报日。检查 API Key、代码是否美股、日期范围或数据源限额。", file=sys.stderr)
 
     if options.export_ics:
         logger.info("导出 ICS 文件：%s", options.export_ics)
@@ -153,47 +136,29 @@ def apply_outputs(
             created = len(sync_diff.to_create)
             updated = len(sync_diff.to_update)
             skipped = len(sync_diff.unchanged)
-            summary.sync_stats = {
-                "created": created,
-                "updated": updated,
-                "skipped": skipped,
-                "total": len(events),
-            }
-            logger.info(
-                "增量同步统计：create=%d update=%d skip=%d total=%d",
-                created,
-                updated,
-                skipped,
-                len(events),
-            )
+            summary.sync_stats = {"created": created, "updated": updated, "skipped": skipped, "total": len(events)}
+            logger.info("增量同步统计：create=%d update=%d skip=%d total=%d", created, updated, skipped, len(events))
         if events_for_google:
             formatted = _format_google_event_lines(events_for_google, options)
-            logger.info(
-                "Google Calendar 待写入事件（%d 条）：\n%s",
-                len(events_for_google),
-                formatted,
-            )
+            logger.info("Google Calendar 待写入事件（%d 条）：\n%s", len(events_for_google), formatted)
             target_calendar_id = google_insert(
                 events_for_google,
-                calendar_id=options.google_calendar_id,
-                creds_path=options.google_credentials,
-                token_path=options.google_token,
-                calendar_name=options.google_calendar_name,
-                create_if_missing=options.google_create_calendar,
-                target_timezone=options.target_timezone,
-                default_duration_minutes=options.event_duration_minutes,
+                config=GoogleCalendarConfig(
+                    calendar_id=options.google_calendar_id,
+                    creds_path=options.google_credentials,
+                    token_path=options.google_token,
+                    calendar_name=options.google_calendar_name,
+                    create_if_missing=options.google_create_calendar,
+                    target_timezone=options.target_timezone,
+                    default_duration_minutes=options.event_duration_minutes,
+                ),
             )
             print(f"已写入 Google Calendar: {target_calendar_id}")
             summary.google_calendar_id = target_calendar_id
         else:
             logger.info("增量同步无需写入 Google Calendar（无变动）")
             if summary.sync_stats is None:
-                summary.sync_stats = {
-                    "created": 0,
-                    "updated": 0,
-                    "skipped": len(events),
-                    "total": len(events),
-                }
+                summary.sync_stats = {"created": 0, "updated": 0, "skipped": len(events), "total": len(events)}
     elif sync_diff is not None:
         summary.sync_stats = {
             "created": len(sync_diff.to_create),
@@ -226,16 +191,13 @@ def run(options: RuntimeOptions, *, today: date | None = None) -> RunSummary:
     summary = apply_outputs(
         events,
         options,
-        since=start_date,
-        until=end_date,
+        window=DateWindow(since=start_date, until=end_date),
         events_for_google=events_for_google,
         sync_diff=sync_diff,
     )
     if options.incremental_sync and options.sync_state_path:
         fingerprints = sync_diff.fingerprints if sync_diff else {}
-        new_state = build_sync_state(
-            events, fingerprints, since=start_date, until=end_date
-        )
+        new_state = build_sync_state(events, fingerprints, since=start_date, until=end_date)
         save_sync_state(options.sync_state_path, new_state)
         if summary.sync_stats is None and sync_diff is not None:
             summary.sync_stats = {
@@ -247,4 +209,4 @@ def run(options: RuntimeOptions, *, today: date | None = None) -> RunSummary:
     return summary
 
 
-__all__ = ["RunSummary", "apply_outputs", "collect_events", "run"]
+__all__ = ["RunSummary", "DateWindow", "apply_outputs", "collect_events", "run"]

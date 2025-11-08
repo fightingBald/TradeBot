@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 from toolkits.notifications import (
+    EmailMessageOptions,
     EmailNotificationService,
+    EmailRecipients,
     EmailSettings,
     load_recipient_config,
 )
@@ -31,10 +33,10 @@ def main() -> None:
     message_id = service.send_email(
         subject="[测试] huayiTradeBot HTML 邮件",
         body=html_body,
-        subtype="html",
-        recipients=recipient_config.to,
-        cc=recipient_config.cc or None,
-        bcc=recipient_config.bcc or None,
+        recipients=EmailRecipients(
+            to=recipient_config.to, cc=recipient_config.cc or None, bcc=recipient_config.bcc or None
+        ),
+        options=EmailMessageOptions(subtype="html"),
     )
 
     print(f"邮件已发送，Message-ID: {message_id}")

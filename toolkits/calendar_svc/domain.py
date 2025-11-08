@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from datetime import date, datetime
-from typing import List, Sequence, Tuple
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -17,15 +17,9 @@ class EarningsEvent(BaseModel):
     source: str = Field("", description="Data provider name")
     url: str | None = None
     notes: str | None = None
-    start_at: datetime | None = Field(
-        default=None, description="Event start time (timezone-aware)"
-    )
-    end_at: datetime | None = Field(
-        default=None, description="Event end time (timezone-aware)"
-    )
-    timezone: str | None = Field(
-        default=None, description="Original timezone identifier"
-    )
+    start_at: datetime | None = Field(default=None, description="Event start time (timezone-aware)")
+    end_at: datetime | None = Field(default=None, description="Event end time (timezone-aware)")
+    timezone: str | None = Field(default=None, description="Original timezone identifier")
 
     @field_validator("symbol", mode="before")
     @classmethod
@@ -72,10 +66,10 @@ def parse_iso_date(raw: str | None) -> date | None:
         return None
 
 
-def deduplicate_events(events: Sequence[EarningsEvent]) -> List[EarningsEvent]:
+def deduplicate_events(events: Sequence[EarningsEvent]) -> list[EarningsEvent]:
     """Remove duplicate events keeping the first occurrence for each (symbol, date)."""
-    seen: set[Tuple[str, date]] = set()
-    unique: List[EarningsEvent] = []
+    seen: set[tuple[str, date]] = set()
+    unique: list[EarningsEvent] = []
     for event in events:
         key = (event.symbol, event.date)
         if key in seen:

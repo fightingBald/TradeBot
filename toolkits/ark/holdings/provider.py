@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import io
 import logging
-from typing import Dict
 
 import pandas as pd
 import requests
@@ -14,7 +13,7 @@ from .transform import parse_snapshot
 
 logger = logging.getLogger(__name__)
 
-FUND_CSV: Dict[str, str] = {
+FUND_CSV: dict[str, str] = {
     "ARKK": "https://assets.ark-funds.com/fund-documents/funds-etf-csv/ARK_INNOVATION_ETF_ARKK_HOLDINGS.csv",
     "ARKQ": "https://assets.ark-funds.com/fund-documents/funds-etf-csv/ARK_AUTONOMOUS_TECH._%26_ROBOTICS_ETF_ARKQ_HOLDINGS.csv",
     "ARKG": "https://assets.ark-funds.com/fund-documents/funds-etf-csv/ARK_GENOMIC_REVOLUTION_ETF_ARKG_HOLDINGS.csv",
@@ -58,15 +57,13 @@ def fetch_holdings_snapshot(etf: str, *, timeout: int = 30) -> HoldingSnapshot:
             price=row.get("price"),
         )
         holdings.append(holding)
-    logger.info(
-        "Fetched %d holdings for %s as of %s", len(holdings), etf_upper, as_of_date
-    )
+    logger.info("Fetched %d holdings for %s as of %s", len(holdings), etf_upper, as_of_date)
     return HoldingSnapshot(etf=etf_upper, as_of=as_of_date, holdings=holdings)
 
 
-def fetch_all_snapshots(*, timeout: int = 30) -> Dict[str, HoldingSnapshot]:
+def fetch_all_snapshots(*, timeout: int = 30) -> dict[str, HoldingSnapshot]:
     """Fetch snapshots for all supported ETFs."""
-    snapshots: Dict[str, HoldingSnapshot] = {}
+    snapshots: dict[str, HoldingSnapshot] = {}
     for etf in FUND_CSV.keys():
         try:
             snapshots[etf] = fetch_holdings_snapshot(etf, timeout=timeout)

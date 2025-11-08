@@ -1,5 +1,6 @@
 import inspect
-from typing import Any, Dict, Iterable, List
+from collections.abc import Iterable
+from typing import Any
 
 from alpaca.common.exceptions import APIError
 from alpaca.data import StockHistoricalDataClient
@@ -14,10 +15,7 @@ class AlpacaMarketDataService:
     """Light wrapper around Alpaca's market data REST client."""
 
     def __init__(self, settings: Settings) -> None:
-        client_kwargs = {
-            "api_key": settings.api_key,
-            "secret_key": settings.api_secret,
-        }
+        client_kwargs = {"api_key": settings.api_key, "secret_key": settings.api_secret}
         signature = inspect.signature(StockHistoricalDataClient.__init__)
         if "base_url" in signature.parameters:
             client_kwargs["base_url"] = settings.base_url
@@ -35,29 +33,22 @@ class AlpacaMarketDataService:
         try:
             self._trading_client = TradingClient(**trading_kwargs)
         except TypeError:
-            self._trading_client = TradingClient(
-                settings.api_key,
-                settings.api_secret,
-                paper=settings.paper_trading,
-            )
+            self._trading_client = TradingClient(settings.api_key, settings.api_secret, paper=settings.paper_trading)
 
-    def get_latest_quotes(self, symbols: Iterable[str]) -> Dict[str, Dict[str, Any]]:
+    def get_latest_quotes(self, symbols: Iterable[str]) -> dict[str, dict[str, Any]]:
         """Fetch latest quote for the provided ticker symbols."""
-        symbols_list: List[str] = list({symbol.upper() for symbol in symbols})
+        symbols_list: list[str] = list({symbol.upper() for symbol in symbols})
         if not symbols_list:
             return {}
 
-        request = StockLatestQuoteRequest(
-            symbol_or_symbols=symbols_list,
-            feed=self._data_feed,
-        )
+        request = StockLatestQuoteRequest(symbol_or_symbols=symbols_list, feed=self._data_feed)
 
         try:
             response = self._client.get_stock_latest_quote(request)
         except APIError as exc:
             raise RuntimeError(f"Failed to fetch quotes from Alpaca: {exc}") from exc
 
-        quotes: Dict[str, Dict[str, Any]] = {}
+        quotes: dict[str, dict[str, Any]] = {}
         for symbol in symbols_list:
             quote = response.get(symbol)
             if quote is None:
@@ -72,7 +63,7 @@ class AlpacaMarketDataService:
             }
         return quotes
 
-    def get_user_positions(self) -> List[UserPosition]:
+    def get_user_positions(self) -> list[UserPosition]:
         """Fetch the currently open positions for the authenticated Alpaca account."""
         try:
             positions = self._trading_client.get_all_positions()

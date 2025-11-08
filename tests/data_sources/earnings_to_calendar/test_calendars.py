@@ -20,12 +20,7 @@ def test_build_ics_generates_expected_fields():
         start_at=datetime(2024, 1, 25, 17, 0, tzinfo=ny),
         end_at=datetime(2024, 1, 25, 18, 0, tzinfo=ny),
     )
-    ics = build_ics(
-        [event],
-        prodid="-//test//",
-        target_timezone=berlin.key,
-        default_duration_minutes=90,
-    )
+    ics = build_ics([event], prodid="-//test//", target_timezone=berlin.key, default_duration_minutes=90)
 
     assert "PRODID:-//test//" in ics
     assert "SUMMARY:AAPL Earnings (AMC)" in ics
@@ -37,9 +32,7 @@ def test_build_ics_generates_expected_fields():
 
 def test_google_insert_creates_calendar_when_missing(monkeypatch):
     service = StubGoogleService()
-    monkeypatch.setattr(
-        calendars_mod, "_get_google_service", lambda *args, **kwargs: service
-    )
+    monkeypatch.setattr(calendars_mod, "_get_google_service", lambda *args, **kwargs: service)
 
     ny = ZoneInfo("America/New_York")
     event = EarningsEvent(
@@ -52,8 +45,7 @@ def test_google_insert_creates_calendar_when_missing(monkeypatch):
         timezone="America/New_York",
     )
 
-    calendar_id = calendars_mod.google_insert(
-        [event],
+    config = calendars_mod.GoogleCalendarConfig(
         calendar_id=None,
         creds_path="cred.json",
         token_path="token.json",
@@ -62,6 +54,7 @@ def test_google_insert_creates_calendar_when_missing(monkeypatch):
         target_timezone="Europe/Berlin",
         default_duration_minutes=75,
     )
+    calendar_id = calendars_mod.google_insert([event], config=config)
 
     assert calendar_id in service.calendars_data
     assert service.calendars_data[calendar_id] == "Company Earnings"
@@ -74,9 +67,7 @@ def test_google_insert_creates_calendar_when_missing(monkeypatch):
 
 def test_google_insert_upserts_existing(monkeypatch):
     service = StubGoogleService({"primary": "Primary"})
-    monkeypatch.setattr(
-        calendars_mod, "_get_google_service", lambda *args, **kwargs: service
-    )
+    monkeypatch.setattr(calendars_mod, "_get_google_service", lambda *args, **kwargs: service)
 
     ny = ZoneInfo("America/New_York")
     base_event = EarningsEvent(
@@ -89,14 +80,14 @@ def test_google_insert_upserts_existing(monkeypatch):
         timezone="America/New_York",
     )
 
-    calendars_mod.google_insert(
-        [base_event],
+    config = calendars_mod.GoogleCalendarConfig(
         calendar_id="primary",
         creds_path="cred.json",
         token_path="token.json",
         target_timezone="America/Chicago",
         default_duration_minutes=45,
     )
+    calendars_mod.google_insert([base_event], config=config)
 
     assert len(service.events_data["primary"]) == 1
     first_event = service.events_data["primary"][0]
@@ -113,14 +104,7 @@ def test_google_insert_upserts_existing(monkeypatch):
         timezone="America/New_York",
     )
 
-    calendars_mod.google_insert(
-        [updated_event],
-        calendar_id="primary",
-        creds_path="cred.json",
-        token_path="token.json",
-        target_timezone="America/Chicago",
-        default_duration_minutes=45,
-    )
+    calendars_mod.google_insert([updated_event], config=config)
 
     assert len(service.events_data["primary"]) == 1
     stored_event = service.events_data["primary"][0]

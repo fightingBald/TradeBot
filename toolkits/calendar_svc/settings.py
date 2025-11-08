@@ -6,9 +6,10 @@ import argparse
 import json
 import os
 import tomllib
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Mapping
+from typing import Any
 
 from .defaults import (
     DEFAULT_EVENT_DURATION_MINUTES,
@@ -86,7 +87,7 @@ _ENV_KEY_SYNC_STATE_PATH = "SYNC_STATE_PATH"
 
 @dataclass
 class RuntimeOptions:
-    symbols: List[str]
+    symbols: list[str]
     source: str
     days: int
     export_ics: str | None
@@ -99,21 +100,21 @@ class RuntimeOptions:
     source_timezone: str
     target_timezone: str
     event_duration_minutes: int
-    session_time_map: Dict[str, str]
+    session_time_map: dict[str, str]
     market_events: bool
     icloud_insert: bool
     icloud_id: str | None
     icloud_app_pass: str | None
     macro_events: bool = False
-    macro_event_keywords: List[str] = field(default_factory=list)
+    macro_event_keywords: list[str] = field(default_factory=list)
     macro_event_source: str = "benzinga"
     incremental_sync: bool = False
     sync_state_path: str | None = None
 
 
-def parse_symbols(raw: Iterable[str]) -> List[str]:
+def parse_symbols(raw: Iterable[str]) -> list[str]:
     """Normalize a list of ticker inputs."""
-    symbols: List[str] = []
+    symbols: list[str] = []
     for token in raw:
         piece = token.strip().upper()
         if piece and piece not in symbols:
@@ -152,14 +153,10 @@ def load_env_file(path: str | None, *, search_root: Path | None = None) -> None:
             _read_env_file(candidate)
             logger.info("已加载环境变量文件：%s", candidate)
             return
-    logger.debug(
-        "未找到可用的环境变量文件，候选路径：%s", ", ".join(str(c) for c in candidates)
-    )
+    logger.debug("未找到可用的环境变量文件，候选路径：%s", ", ".join(str(c) for c in candidates))
 
 
-def load_config(
-    config_path: str | None, default_path: Path | None = None
-) -> tuple[Dict[str, Any], Path | None]:
+def load_config(config_path: str | None, default_path: Path | None = None) -> tuple[dict[str, Any], Path | None]:
     """Read CLI configuration from TOML or JSON."""
     cfg_path: Path | None = None
     create_template = False
@@ -225,7 +222,7 @@ def _coerce_bool(value: Any) -> bool | None:
     raise ValueError("布尔配置必须是 true/false 或 1/0")
 
 
-def _coerce_symbols(value: Any) -> List[str]:
+def _coerce_symbols(value: Any) -> list[str]:
     if value is None:
         return []
     if isinstance(value, str):
@@ -235,7 +232,7 @@ def _coerce_symbols(value: Any) -> List[str]:
     raise ValueError("symbols 配置必须是字符串或字符串列表")
 
 
-def _coerce_str_list(value: Any) -> List[str]:
+def _coerce_str_list(value: Any) -> list[str]:
     if value is None:
         return []
     if isinstance(value, str):
@@ -246,13 +243,13 @@ def _coerce_str_list(value: Any) -> List[str]:
     raise ValueError("宏观事件关键词必须是字符串或字符串列表")
 
 
-def _parse_session_times(value: Any, default: Dict[str, str]) -> Dict[str, str]:
+def _parse_session_times(value: Any, default: dict[str, str]) -> dict[str, str]:
     if value is None:
         return {k.upper(): v for k, v in default.items()}
     if isinstance(value, dict):
         return {str(k).upper(): str(v) for k, v in value.items()}
     if isinstance(value, str):
-        entries: Dict[str, str] = {}
+        entries: dict[str, str] = {}
         for part in value.split(","):
             if "=" not in part:
                 continue
@@ -290,235 +287,207 @@ def _resolve_path(value: Any, *, base: Path | None, root: Path) -> str | None:
     return str(candidates[0])
 
 
-def build_runtime_options(
-    parsed: argparse.Namespace,
-    config: Mapping[str, Any],
-    *,
-    config_base: Path | None,
-    project_root: Path,
-) -> RuntimeOptions:
-    symbols: List[str] = []
-    if getattr(parsed, "symbols", None):
-        symbols = parse_symbols(str(parsed.symbols).split(","))
-    elif "symbols" in config:
-        symbols = _coerce_symbols(config.get("symbols"))
-    if not symbols:
-        raise ValueError("请至少提供一个有效的股票代码。")
+@dataclass(slots=True)
+class _ResolverContext:
+    parsed: argparse.Namespace
+    config: Mapping[str, Any]
 
-    source = str(parsed.source or config.get("source") or _DEFAULT_SOURCE)
 
-    if getattr(parsed, "days", None) is not None:
-        days = int(parsed.days)
-    elif "days" in config:
-        days = _coerce_int(config.get("days"), field="days")
-    else:
-        days = DEFAULT_LOOKAHEAD_DAYS
+@dataclass(slots=True)
+class _GoogleOptions:
+    credentials: str
+    token: str
+    calendar_id: str | None
+    calendar_name: str | None
+    create_if_missing: bool
 
-    export_ics = getattr(parsed, "export_ics", None) or config.get("export_ics")
 
-    env_google_credentials = os.getenv(_ENV_KEY_GOOGLE_CREDENTIALS)
+def _resolve_symbols_arg(ctx: _ResolverContext) -> list[str]:
+    if getattr(ctx.parsed, "symbols", None):
+        return parse_symbols(str(ctx.parsed.symbols).split(","))
+    if "symbols" in ctx.config:
+        return _coerce_symbols(ctx.config.get("symbols"))
+    raise ValueError("请至少提供一个有效的股票代码。")
+
+
+def _resolve_days(ctx: _ResolverContext) -> int:
+    if getattr(ctx.parsed, "days", None) is not None:
+        return int(ctx.parsed.days)
+    if "days" in ctx.config:
+        return _coerce_int(ctx.config.get("days"), field="days")
+    return DEFAULT_LOOKAHEAD_DAYS
+
+
+def _resolve_flag(
+    ctx: _ResolverContext, attr: str, *, config_key: str, env_key: str | None = None, default: bool = False
+) -> bool:
+    if getattr(ctx.parsed, attr, False):
+        return True
+    config_val = _coerce_bool(ctx.config.get(config_key)) if config_key in ctx.config else None
+    if config_val is not None:
+        return config_val
+    if env_key:
+        env_val = _coerce_bool(os.getenv(env_key))
+        if env_val is not None:
+            return env_val
+    return default
+
+
+def _resolve_optional_str(
+    ctx: _ResolverContext, attr: str, *, config_key: str | None = None, env_key: str | None = None
+) -> str | None:
+    candidates = [
+        getattr(ctx.parsed, attr, None),
+        ctx.config.get(config_key) if config_key else None,
+        os.getenv(env_key) if env_key else None,
+    ]
+    for candidate in candidates:
+        if candidate in (None, ""):
+            continue
+        return str(candidate)
+    return None
+
+
+def _resolve_google_options(ctx: _ResolverContext, *, config_base: Path | None, project_root: Path) -> _GoogleOptions:
     raw_google_credentials = (
-        getattr(parsed, "google_credentials", None)
-        or config.get("google_credentials")
-        or env_google_credentials
+        getattr(ctx.parsed, "google_credentials", None)
+        or ctx.config.get("google_credentials")
+        or os.getenv(_ENV_KEY_GOOGLE_CREDENTIALS)
         or _DEFAULT_GOOGLE_CREDENTIALS
     )
-    google_credentials = _resolve_path(
-        raw_google_credentials, base=config_base, root=project_root
-    )
+    google_credentials = _resolve_path(raw_google_credentials, base=config_base, root=project_root)
 
-    env_google_token = os.getenv(_ENV_KEY_GOOGLE_TOKEN)
     raw_google_token = (
-        getattr(parsed, "google_token", None)
-        or config.get("google_token")
-        or env_google_token
+        getattr(ctx.parsed, "google_token", None)
+        or ctx.config.get("google_token")
+        or os.getenv(_ENV_KEY_GOOGLE_TOKEN)
         or _DEFAULT_GOOGLE_TOKEN
     )
     google_token = _resolve_path(raw_google_token, base=config_base, root=project_root)
 
-    raw_calendar_id = (
-        getattr(parsed, "google_calendar_id", None)
-        or config.get("google_calendar_id")
-        or os.getenv(_ENV_KEY_GOOGLE_CALENDAR_ID)
+    calendar_id = _resolve_optional_str(
+        ctx, "google_calendar_id", config_key="google_calendar_id", env_key=_ENV_KEY_GOOGLE_CALENDAR_ID
     )
-    google_calendar_id = str(raw_calendar_id) if raw_calendar_id else None
-
-    google_calendar_name = (
-        getattr(parsed, "google_calendar_name", None)
-        or config.get("google_calendar_name")
-        or os.getenv(_ENV_KEY_GOOGLE_CALENDAR_NAME)
+    calendar_name = _resolve_optional_str(
+        ctx, "google_calendar_name", config_key="google_calendar_name", env_key=_ENV_KEY_GOOGLE_CALENDAR_NAME
     )
-    if google_calendar_name:
-        google_calendar_name = str(google_calendar_name)
+    if not calendar_id and not calendar_name:
+        calendar_id = "primary"
 
-    if not google_calendar_id and not google_calendar_name:
-        google_calendar_id = "primary"
+    google_create_calendar = _resolve_flag(
+        ctx,
+        "google_create_calendar",
+        config_key="google_create_calendar",
+        env_key=_ENV_KEY_GOOGLE_CREATE_CAL,
+        default=False,
+    )
 
-    if getattr(parsed, "google_create_calendar", False):
-        google_create_calendar = True
+    return _GoogleOptions(
+        credentials=str(google_credentials),
+        token=str(google_token),
+        calendar_id=calendar_id,
+        calendar_name=calendar_name,
+        create_if_missing=google_create_calendar,
+    )
+
+
+def _resolve_timezone(ctx: _ResolverContext, attr: str, *, config_key: str, env_key: str, default: str) -> str:
+    value = getattr(ctx.parsed, attr, None) or ctx.config.get(config_key) or os.getenv(env_key) or default
+    return str(value)
+
+
+def _resolve_event_duration(ctx: _ResolverContext) -> int:
+    if getattr(ctx.parsed, "event_duration", None) is not None:
+        event_duration = int(ctx.parsed.event_duration)
+    elif "event_duration_minutes" in ctx.config:
+        event_duration = _coerce_int(ctx.config.get("event_duration_minutes"), field="event_duration_minutes")
     else:
-        config_create_flag = (
-            _coerce_bool(config.get("google_create_calendar"))
-            if "google_create_calendar" in config
-            else None
-        )
-        if config_create_flag is not None:
-            google_create_calendar = config_create_flag
-        else:
-            env_create_flag = _coerce_bool(os.getenv(_ENV_KEY_GOOGLE_CREATE_CAL))
-            google_create_calendar = (
-                env_create_flag if env_create_flag is not None else False
-            )
-
-    source_timezone = (
-        getattr(parsed, "source_tz", None)
-        or config.get("source_timezone")
-        or os.getenv(_ENV_KEY_SOURCE_TZ)
-        or DEFAULT_SOURCE_TIMEZONE
-    )
-
-    target_timezone = (
-        getattr(parsed, "target_tz", None)
-        or config.get("target_timezone")
-        or os.getenv(_ENV_KEY_TARGET_TZ)
-        or DEFAULT_TARGET_TIMEZONE
-    )
-
-    if getattr(parsed, "event_duration", None) is not None:
-        event_duration = int(parsed.event_duration)
-    elif "event_duration_minutes" in config:
-        event_duration = _coerce_int(
-            config.get("event_duration_minutes"), field="event_duration_minutes"
-        )
-    else:
-        event_duration = int(
-            os.getenv(_ENV_KEY_EVENT_DURATION) or DEFAULT_EVENT_DURATION_MINUTES
-        )
+        env_duration = os.getenv(_ENV_KEY_EVENT_DURATION)
+        event_duration = int(env_duration) if env_duration not in (None, "") else DEFAULT_EVENT_DURATION_MINUTES
     if event_duration <= 0:
         raise ValueError("event_duration_minutes 必须为正整数")
+    return event_duration
+
+
+def _resolve_macro_keywords(ctx: _ResolverContext) -> list[str]:
+    raw_macro_keywords = (
+        getattr(ctx.parsed, "macro_event_keywords", None)
+        or ctx.config.get("macro_event_keywords")
+        or os.getenv(_ENV_KEY_MACRO_KEYWORDS)
+    )
+    return _coerce_str_list(raw_macro_keywords)
+
+
+def _resolve_macro_source(ctx: _ResolverContext) -> str:
+    raw_macro_source = (
+        getattr(ctx.parsed, "macro_event_source", None)
+        or ctx.config.get("macro_event_source")
+        or os.getenv(_ENV_KEY_MACRO_SOURCE)
+    )
+    macro_event_source = str(raw_macro_source).strip().lower() if raw_macro_source else "benzinga"
+    if macro_event_source != "benzinga":
+        raise ValueError("macro_event_source 目前仅支持 benzinga")
+    return macro_event_source
+
+
+def build_runtime_options(
+    parsed: argparse.Namespace, config: Mapping[str, Any], *, config_base: Path | None, project_root: Path
+) -> RuntimeOptions:
+    ctx = _ResolverContext(parsed=parsed, config=config)
+
+    symbols = _resolve_symbols_arg(ctx)
+    source = str(getattr(parsed, "source", None) or ctx.config.get("source") or _DEFAULT_SOURCE)
+    days = _resolve_days(ctx)
+    export_ics = getattr(parsed, "export_ics", None) or ctx.config.get("export_ics")
+
+    google_opts = _resolve_google_options(ctx, config_base=config_base, project_root=project_root)
+
+    source_timezone = _resolve_timezone(
+        ctx, "source_tz", config_key="source_timezone", env_key=_ENV_KEY_SOURCE_TZ, default=DEFAULT_SOURCE_TIMEZONE
+    )
+    target_timezone = _resolve_timezone(
+        ctx, "target_tz", config_key="target_timezone", env_key=_ENV_KEY_TARGET_TZ, default=DEFAULT_TARGET_TIMEZONE
+    )
+
+    event_duration = _resolve_event_duration(ctx)
 
     session_time_map = _parse_session_times(
-        getattr(parsed, "session_times", None)
-        or config.get("session_times")
-        or os.getenv(_ENV_KEY_SESSION_TIMES),
+        getattr(parsed, "session_times", None) or ctx.config.get("session_times") or os.getenv(_ENV_KEY_SESSION_TIMES),
         default=DEFAULT_SESSION_TIMES,
     )
 
-    if getattr(parsed, "market_events", None):
-        market_events = True
-    else:
-        config_market_events = (
-            _coerce_bool(config.get("market_events"))
-            if "market_events" in config
-            else None
-        )
-        if config_market_events is not None:
-            market_events = config_market_events
-        else:
-            env_market_events = _coerce_bool(os.getenv(_ENV_KEY_MARKET_EVENTS))
-            market_events = (
-                env_market_events if env_market_events is not None else False
-            )
-
-    if getattr(parsed, "google_insert", None):
-        google_insert = True
-    else:
-        google_insert = False
-        config_google_insert = (
-            _coerce_bool(config.get("google_insert"))
-            if "google_insert" in config
-            else None
-        )
-        if config_google_insert is not None:
-            google_insert = config_google_insert
-        else:
-            env_google_insert = _coerce_bool(os.getenv(_ENV_KEY_GOOGLE_INSERT))
-            if env_google_insert is not None:
-                google_insert = env_google_insert
-
-    if getattr(parsed, "icloud_insert", None):
-        icloud_insert = True
-    else:
-        icloud_insert = False
-        config_icloud_insert = (
-            _coerce_bool(config.get("icloud_insert"))
-            if "icloud_insert" in config
-            else None
-        )
-        if config_icloud_insert is not None:
-            icloud_insert = config_icloud_insert
-        else:
-            env_icloud_insert = _coerce_bool(os.getenv(_ENV_KEY_ICLOUD_INSERT))
-            if env_icloud_insert is not None:
-                icloud_insert = env_icloud_insert
-
-    icloud_id = (
-        getattr(parsed, "icloud_id", None)
-        or config.get("icloud_id")
-        or os.getenv(_ENV_KEY_ICLOUD_ID)
+    market_events = _resolve_flag(
+        ctx, "market_events", config_key="market_events", env_key=_ENV_KEY_MARKET_EVENTS, default=False
     )
-    icloud_app_pass = (
-        getattr(parsed, "icloud_app_pass", None)
-        or config.get("icloud_app_pass")
-        or os.getenv(_ENV_KEY_ICLOUD_APP_PASS)
+    google_insert = _resolve_flag(
+        ctx, "google_insert", config_key="google_insert", env_key=_ENV_KEY_GOOGLE_INSERT, default=False
+    )
+    icloud_insert = _resolve_flag(
+        ctx, "icloud_insert", config_key="icloud_insert", env_key=_ENV_KEY_ICLOUD_INSERT, default=False
     )
 
-    if getattr(parsed, "macro_events", None):
-        macro_events = True
-    else:
-        config_macro_events = (
-            _coerce_bool(config.get("macro_events"))
-            if "macro_events" in config
-            else None
-        )
-        if config_macro_events is not None:
-            macro_events = config_macro_events
-        else:
-            env_macro_events = _coerce_bool(os.getenv(_ENV_KEY_MACRO_EVENTS))
-            macro_events = env_macro_events if env_macro_events is not None else False
-
-    raw_macro_keywords = (
-        getattr(parsed, "macro_event_keywords", None)
-        or config.get("macro_event_keywords")
-        or os.getenv(_ENV_KEY_MACRO_KEYWORDS)
+    icloud_id = _resolve_optional_str(ctx, "icloud_id", config_key="icloud_id", env_key=_ENV_KEY_ICLOUD_ID)
+    icloud_app_pass = _resolve_optional_str(
+        ctx, "icloud_app_pass", config_key="icloud_app_pass", env_key=_ENV_KEY_ICLOUD_APP_PASS
     )
-    macro_event_keywords = _coerce_str_list(raw_macro_keywords)
 
-    raw_macro_source = (
-        getattr(parsed, "macro_event_source", None)
-        or config.get("macro_event_source")
-        or os.getenv(_ENV_KEY_MACRO_SOURCE)
+    macro_events = _resolve_flag(
+        ctx, "macro_events", config_key="macro_events", env_key=_ENV_KEY_MACRO_EVENTS, default=False
     )
-    macro_event_source = (
-        str(raw_macro_source).strip().lower() if raw_macro_source else "benzinga"
-    )
-    if macro_event_source != "benzinga":
-        raise ValueError("macro_event_source 目前仅支持 benzinga")
+    macro_event_keywords = _resolve_macro_keywords(ctx)
+    macro_event_source = _resolve_macro_source(ctx)
 
-    incremental_sync = bool(getattr(parsed, "incremental", False))
-    if not incremental_sync:
-        config_incremental = (
-            _coerce_bool(config.get("incremental_sync"))
-            if "incremental_sync" in config
-            else None
-        )
-        if config_incremental is not None:
-            incremental_sync = config_incremental
-        else:
-            env_incremental = _coerce_bool(os.getenv(_ENV_KEY_INCREMENTAL_SYNC))
-            incremental_sync = env_incremental if env_incremental is not None else False
-
-    raw_sync_state_path = (
-        getattr(parsed, "sync_state_path", None)
-        or config.get("sync_state_path")
-        or os.getenv(_ENV_KEY_SYNC_STATE_PATH)
+    incremental_sync = _resolve_flag(
+        ctx, "incremental", config_key="incremental_sync", env_key=_ENV_KEY_INCREMENTAL_SYNC, default=False
     )
-    if not raw_sync_state_path and incremental_sync:
+
+    raw_sync_state_path = _resolve_optional_str(
+        ctx, "sync_state_path", config_key="sync_state_path", env_key=_ENV_KEY_SYNC_STATE_PATH
+    )
+    if incremental_sync and not raw_sync_state_path:
         raw_sync_state_path = _DEFAULT_SYNC_STATE
     sync_state_path = (
-        _resolve_path(raw_sync_state_path, base=config_base, root=project_root)
-        if raw_sync_state_path
-        else None
+        _resolve_path(raw_sync_state_path, base=config_base, root=project_root) if raw_sync_state_path else None
     )
 
     options = RuntimeOptions(
@@ -527,13 +496,11 @@ def build_runtime_options(
         days=days,
         export_ics=export_ics,
         google_insert=google_insert,
-        google_credentials=str(google_credentials),
-        google_token=str(google_token),
-        google_calendar_id=(
-            str(google_calendar_id) if google_calendar_id is not None else None
-        ),
-        google_calendar_name=google_calendar_name,
-        google_create_calendar=google_create_calendar,
+        google_credentials=google_opts.credentials,
+        google_token=google_opts.token,
+        google_calendar_id=google_opts.calendar_id,
+        google_calendar_name=google_opts.calendar_name,
+        google_create_calendar=google_opts.create_if_missing,
         source_timezone=str(source_timezone),
         target_timezone=str(target_timezone),
         event_duration_minutes=event_duration,
@@ -552,10 +519,4 @@ def build_runtime_options(
     return options
 
 
-__all__ = [
-    "RuntimeOptions",
-    "build_runtime_options",
-    "load_config",
-    "load_env_file",
-    "parse_symbols",
-]
+__all__ = ["RuntimeOptions", "build_runtime_options", "load_config", "load_env_file", "parse_symbols"]

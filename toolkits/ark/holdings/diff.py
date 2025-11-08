@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import Dict, Iterable, List
 
 from .domain import Holding, HoldingSnapshot
 
@@ -21,17 +21,13 @@ class HoldingChange:
     current: Holding | None
 
 
-def _build_index(snapshot: HoldingSnapshot) -> Dict[str, Holding]:
+def _build_index(snapshot: HoldingSnapshot) -> dict[str, Holding]:
     return {holding.ticker.upper(): holding for holding in snapshot.holdings}
 
 
 def diff_snapshots(
-    previous: HoldingSnapshot,
-    current: HoldingSnapshot,
-    *,
-    weight_threshold: float = 1e-4,
-    share_threshold: float = 1.0,
-) -> List[HoldingChange]:
+    previous: HoldingSnapshot, current: HoldingSnapshot, *, weight_threshold: float = 1e-4, share_threshold: float = 1.0
+) -> list[HoldingChange]:
     """Compare two snapshots and return holding changes.
 
     Args:
@@ -47,7 +43,7 @@ def diff_snapshots(
     prev_index = _build_index(previous)
     curr_index = _build_index(current)
     all_tickers = set(prev_index) | set(curr_index)
-    changes: List[HoldingChange] = []
+    changes: list[HoldingChange] = []
 
     for ticker in sorted(all_tickers):
         prev = prev_index.get(ticker)
@@ -78,9 +74,7 @@ def diff_snapshots(
                     action="exit",
                     shares_change=-(prev.shares or 0.0),
                     weight_change=-(prev.weight or 0.0),
-                    market_value_change=(
-                        -(prev.market_value or 0.0) if prev.market_value else None
-                    ),
+                    market_value_change=(-(prev.market_value or 0.0) if prev.market_value else None),
                     previous=prev,
                     current=None,
                 )
@@ -115,13 +109,11 @@ def diff_snapshots(
     return changes
 
 
-def summarize_changes(
-    changes: Iterable[HoldingChange], *, top_n: int = 10
-) -> Dict[str, List[HoldingChange]]:
+def summarize_changes(changes: Iterable[HoldingChange], *, top_n: int = 10) -> dict[str, list[HoldingChange]]:
     """Split changes into buys and sells sorted by absolute weight change."""
 
-    buys: List[HoldingChange] = []
-    sells: List[HoldingChange] = []
+    buys: list[HoldingChange] = []
+    sells: list[HoldingChange] = []
     for change in changes:
         if change.action in {"new", "buy"}:
             buys.append(change)
@@ -130,10 +122,7 @@ def summarize_changes(
 
     buys_sorted = sorted(buys, key=_weight_abs, reverse=True)[:top_n]
     sells_sorted = sorted(sells, key=_weight_abs, reverse=True)[:top_n]
-    return {
-        "buys": buys_sorted,
-        "sells": sells_sorted,
-    }
+    return {"buys": buys_sorted, "sells": sells_sorted}
 
 
 def _weight_abs(change: HoldingChange) -> float:

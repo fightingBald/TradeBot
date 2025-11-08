@@ -3,10 +3,8 @@ from zoneinfo import ZoneInfo
 
 import toolkits.calendar_svc.calendars as calendars_mod
 import toolkits.calendar_svc.runner as runner_mod
-from toolkits.calendar_svc import providers as providers_mod
+from toolkits.calendar_svc import RuntimeOptions, providers as providers_mod, run
 from toolkits.calendar_svc.domain import EarningsEvent
-from toolkits.calendar_svc import run
-from toolkits.calendar_svc import RuntimeOptions
 
 
 class _StubProvider:
@@ -36,9 +34,9 @@ def test_run_pipeline_writes_outputs(tmp_path, monkeypatch):
 
     google_calls = {}
 
-    def fake_google_insert(events, **kwargs):
+    def fake_google_insert(events, config=None):
         google_calls["events"] = list(events)
-        google_calls["kwargs"] = kwargs
+        google_calls["config"] = config
         return "calendar-123"
 
     monkeypatch.setattr(calendars_mod, "google_insert", fake_google_insert)
@@ -79,7 +77,7 @@ def test_run_pipeline_writes_outputs(tmp_path, monkeypatch):
     assert ics_path.exists()
     # Events should be deduplicated before write
     assert len(summary.events) == 1
-    assert google_calls["kwargs"]["calendar_name"] == "Company Earnings"
+    assert google_calls["config"].calendar_name == "Company Earnings"
     assert len(google_calls["events"]) == 1
 
 
@@ -89,7 +87,7 @@ def test_run_incremental_skips_when_state_matches(tmp_path, monkeypatch):
 
     google_batches: list[list] = []
 
-    def fake_google_insert(events, **kwargs):
+    def fake_google_insert(events, config=None):
         google_batches.append(list(events))
         return "calendar-xyz"
 
@@ -127,21 +125,11 @@ def test_run_incremental_skips_when_state_matches(tmp_path, monkeypatch):
 
     first_summary = run(options, today=date(2024, 3, 1))
     assert google_batches and len(google_batches[0]) == 1
-    assert first_summary.sync_stats == {
-        "created": 1,
-        "updated": 0,
-        "skipped": 0,
-        "total": 1,
-    }
+    assert first_summary.sync_stats == {"created": 1, "updated": 0, "skipped": 0, "total": 1}
 
     google_batches.clear()
 
     second_summary = run(options, today=date(2024, 3, 1))
     assert not google_batches  # 没有再次调用写入
-    assert second_summary.sync_stats == {
-        "created": 0,
-        "updated": 0,
-        "skipped": 1,
-        "total": 1,
-    }
+    assert second_summary.sync_stats == {"created": 0, "updated": 0, "skipped": 1, "total": 1}
     assert sync_path.exists()

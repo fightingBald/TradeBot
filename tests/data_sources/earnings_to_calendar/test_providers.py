@@ -1,11 +1,7 @@
 from datetime import date, datetime, timedelta
 from zoneinfo import ZoneInfo
 
-from toolkits.calendar_svc import (
-    DEFAULT_EVENT_DURATION_MINUTES,
-    DEFAULT_SESSION_TIMES,
-    DEFAULT_SOURCE_TIMEZONE,
-)
+from toolkits.calendar_svc import DEFAULT_EVENT_DURATION_MINUTES, DEFAULT_SESSION_TIMES, DEFAULT_SOURCE_TIMEZONE
 from toolkits.calendar_svc.providers import FinnhubEarningsProvider, FmpEarningsProvider
 
 from .conftest import StubResponse
@@ -42,9 +38,7 @@ def test_fmp_provider_filters_and_normalizes(monkeypatch):
     assert len(events) == 2
     ny = ZoneInfo("America/New_York")
     assert events[0].start_at == datetime(2024, 1, 25, 17, 0, tzinfo=ny)
-    assert events[0].end_at == events[0].start_at + timedelta(
-        minutes=DEFAULT_EVENT_DURATION_MINUTES
-    )
+    assert events[0].end_at == events[0].start_at + timedelta(minutes=DEFAULT_EVENT_DURATION_MINUTES)
     assert events[0].timezone == "America/New_York"
     assert events[1].start_at is None
     assert events[1].end_at is None
@@ -53,15 +47,11 @@ def test_fmp_provider_filters_and_normalizes(monkeypatch):
 
 def test_finnhub_provider_handles_nested_payload(monkeypatch):
     payload = {
-        "earningsCalendar": [
-            {"symbol": "AAPL", "date": "2024-01-25", "hour": "bmo"},
-            {"symbol": "GOOGL", "date": None},
-        ]
+        "earningsCalendar": [{"symbol": "AAPL", "date": "2024-01-25", "hour": "bmo"}, {"symbol": "GOOGL", "date": None}]
     }
 
     monkeypatch.setattr(
-        "toolkits.calendar_svc.providers.httpx.get",
-        lambda url, *, headers, timeout: StubResponse(payload),
+        "toolkits.calendar_svc.providers.httpx.get", lambda url, *, headers, timeout: StubResponse(payload)
     )
 
     provider = FinnhubEarningsProvider(
@@ -75,6 +65,4 @@ def test_finnhub_provider_handles_nested_payload(monkeypatch):
     assert len(events) == 1
     ny = ZoneInfo("America/New_York")
     assert events[0].start_at == datetime(2024, 1, 25, 8, 0, tzinfo=ny)
-    assert events[0].end_at == events[0].start_at + timedelta(
-        minutes=DEFAULT_EVENT_DURATION_MINUTES
-    )
+    assert events[0].end_at == events[0].start_at + timedelta(minutes=DEFAULT_EVENT_DURATION_MINUTES)

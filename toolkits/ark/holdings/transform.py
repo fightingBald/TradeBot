@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import re
-from typing import Tuple
 
 import pandas as pd
 
@@ -56,7 +55,7 @@ def clean_numeric_columns(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-def parse_snapshot(df: pd.DataFrame) -> Tuple[pd.Timestamp, pd.DataFrame]:
+def parse_snapshot(df: pd.DataFrame) -> tuple[pd.Timestamp, pd.DataFrame]:
     """Return normalised dataframe and snapshot date."""
     df = normalize_columns(df)
     if "date" not in df.columns:

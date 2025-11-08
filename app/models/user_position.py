@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from decimal import Decimal
-from typing import Any, Dict, Optional
+from typing import Any
 
 from pydantic import AliasChoices, BaseModel, ConfigDict, Field, field_validator
 
@@ -11,18 +11,18 @@ class UserPosition(BaseModel):
 
     symbol: str
     asset_id: str
-    asset_class: Optional[str] = None
-    exchange: Optional[str] = None
+    asset_class: str | None = None
+    exchange: str | None = None
     side: str
     quantity: Decimal = Field(validation_alias=AliasChoices("quantity", "qty"))
     avg_entry_price: Decimal
     market_value: Decimal
     cost_basis: Decimal
-    unrealized_pl: Optional[Decimal] = None
-    unrealized_plpc: Optional[Decimal] = None
-    current_price: Optional[Decimal] = None
-    lastday_price: Optional[Decimal] = None
-    change_today: Optional[Decimal] = None
+    unrealized_pl: Decimal | None = None
+    unrealized_plpc: Decimal | None = None
+    current_price: Decimal | None = None
+    lastday_price: Decimal | None = None
+    change_today: Decimal | None = None
 
     model_config = ConfigDict(populate_by_name=True, arbitrary_types_allowed=False)
 
@@ -34,10 +34,10 @@ class UserPosition(BaseModel):
         return str(value)
 
     @classmethod
-    def from_alpaca(cls, position: Any) -> "UserPosition":
+    def from_alpaca(cls, position: Any) -> UserPosition:
         """Factory that maps an Alpaca SDK Position object or dict into the domain model."""
         if hasattr(position, "model_dump"):
-            raw: Dict[str, Any] = position.model_dump()
+            raw: dict[str, Any] = position.model_dump()
         elif hasattr(position, "dict"):
             raw = position.dict()
         elif isinstance(position, dict):
