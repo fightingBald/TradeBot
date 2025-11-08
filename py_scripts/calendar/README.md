@@ -1,42 +1,44 @@
-# Calendar CLI (`py_scripts/calendar/run.py`)
+# 财报日历 CLI 说明（`py_scripts/calendar/run.py`）
 
-该脚本是 `toolkits/calendar_svc` 的官方命令行入口，负责解析参数、读取配置与 `.env`，最终调用库层完成“抓取财报/宏观事件 → 写入 ICS/Google/iCloud”。
+## 这玩意儿干嘛用？
+负责把 FMP/Finnhub 抓到的财报、宏观事件整理成日历事件，可导出 ICS，也能直接推到 Google Calendar 或 iCloud。所有真正的业务逻辑在 `toolkits/calendar_svc/`，这个 README 只讲怎么用命令。
 
-## 环境准备
-
+## 准备动作
 ```bash
 cd /path/to/AlpacaTrading
-pip install -r requirements.txt
+source .venv/bin/activate        # 没有就先建 venv
+pip install -e .
 ```
 
-设置数据源凭据（示例）：
-
-```bash
-export FMP_API_KEY=your_fmp_token
-export FINNHUB_API_KEY=your_finnhub_token
-export BENZINGA_API_KEY=your_benzinga_token
+需要的环境变量放在 `.env`（示例）：
+```
+FMP_API_KEY=your_fmp_token
+FINNHUB_API_KEY=your_finnhub_token
+BENZINGA_API_KEY=your_benzinga_token
+GOOGLE_CREDENTIALS_PATH=secrets/credentials.json
+GOOGLE_TOKEN_PATH=secrets/token.json
+GOOGLE_CALENDAR_NAME=Company Earnings
+GOOGLE_CREATE_CALENDAR=true
 ```
 
 ## 查看帮助
-
 ```bash
-cd /path/to/AlpacaTrading
-python py_scripts/calendar/run.py --help
+earnings-calendar --help
+# 或者 python -m py_scripts.calendar.run --help
 ```
 
-## 常见命令
-
+## 常用命令
 ```bash
-# 拉取 FMP 数据并导出 ICS
-python py_scripts/calendar/run.py \
+# 仅导出 ICS
+earnings-calendar \
   --symbols=AAPL,MSFT,NVDA \
   --source=fmp \
   --days=90 \
   --export-ics=earnings.ics
 
-# 使用配置文件 + .env，直接写入 Google Calendar
-python py_scripts/calendar/run.py \
-  --config=config/events_to_google_calendar.toml\
+# 用 TOML + .env，一次性写入 Google Calendar，并附带市场/宏观事件
+earnings-calendar \
+  --config=config/events_to_google_calendar.toml \
   --env-file=.env \
   --google-insert \
   --market-events \
@@ -44,39 +46,30 @@ python py_scripts/calendar/run.py \
   --log-level=INFO
 ```
 
-## 主要参数
-
-- `--symbols`：逗号分隔股票代码（默认读取配置文件）。
+## 参数大白话
+- `--symbols`：逗号分隔的股票列表；不填就用配置文件的。
 - `--source`：`fmp` 或 `finnhub`。
-- `--days`：查询区间天数。
-- `--export-ics`：导出本地 ICS 文件。
-- `--google-insert` 与相关 `--google-*` 参数：写入 Google Calendar 时需提供凭据/日历信息。
-- `--market-events` / `--macro-events`：是否附加衍生市场事件或 Benzinga 宏观事件；`--macro-event-keywords` 可筛选事件。
-- `--incremental` + `--sync-state-path`：开启 Google Calendar 增量同步，避免重复写入。
-- `--icloud-insert` + `--icloud-*`：写入 iCloud CalDAV。
-- `--source-tz` / `--target-tz`、`--event-duration`、`--session-times`：控制时间相关设置。
-- `--env-file`：读取 `.env` 风格文件；未提供则默认寻找项目根目录 `.env`。
-- `--config`：TOML/JSON 配置文件（默认 `config/events_to_google_calendar.toml`）。
+- `--days`：从今天起往后看几天。
+- `--export-ics`：给个路径就会生成本地 ICS。
+- `--google-insert` + `--google-*`：需要把事件写进 Google Calendar 时用。
+- `--market-events` / `--macro-events`：附加衍生品结算日、Benzinga 宏观日历；`--macro-event-keywords` 可作白名单。
+- `--incremental` + `--sync-state-path`：做增量同步，避免重复写 Google。
+- `--icloud-insert` + `--icloud-*`：写 iCloud CalDAV。
+- `--source-tz` / `--target-tz` / `--event-duration` / `--session-times`：各种时间设置。
+- `--env-file`：默认找项目根目录 `.env`，也可以指定其它路径。
+- `--config`：TOML/JSON 配置；默认是 `config/events_to_google_calendar.toml`，文件不存在会自动生成模板。
 
-## `.env` & 配置文件
+优先级：命令行 > TOML > `.env` > 默认值。只覆盖你关心的字段就好。
 
-- `.env` 示例：
-  ```
-  FMP_API_KEY=xxx
-  BENZINGA_API_KEY=xxx
-  GOOGLE_CREDENTIALS_PATH=secrets/credentials.json
-  GOOGLE_TOKEN_PATH=secrets/token.json
-  GOOGLE_INSERT=true
-  ```
-- `config/events_to_google_calendar.toml` 可配置 symbols、时区、会话时间映射、是否启用市场/宏观事件、增量同步等。脚本会自动在命令行参数 > TOML > `.env` > 默认值 之间取优先级。
+## `.env` 与配置文件
+- `.env` 存 API Key、Google 凭据位置、是否默认写入 Google 等开关。
+- `config/events_to_google_calendar.toml` 存符号列表、时区、会话时间、是否启用市场/宏观事件、增量同步路径等。首次跑如果没有会自动创建一份模板。
 
-## Google Calendar 授权流程
+## Google Calendar 授权
+1. Google Cloud Console 打开 Calendar API，下载 `credentials.json`。
+2. 放到仓库的 `secrets/credentials.json`（目录在 `.gitignore` 里，安全）。
+3. 首次运行带 `--google-insert` 的命令时，浏览器会提示授权；登录完成后会生成 `token.json`，以后都会复用。
 
-1. 从 Google API Console 下载 `credentials.json` 并放入 `secrets/credentials.json`。
-2. 首次运行带 `--google-insert` 的命令，会跳转到浏览器授权；完成后会生成 `token.json`。
-3. 后续脚本会自动复用/刷新该 token。
-
-## 备注
-
-- 自定义脚本可直接 `import toolkits.calendar_svc_svc` 调用业务函数；此处 CLI 只是官方示例。
-- 如果需要在 CI 中运行，可沿用此脚本，再用环境变量或参数注入配置。 
+## 其它提醒
+- 直接写脚本也行，`toolkits.calendar_svc` 里导出的函数都可用。
+- CI 场景也是跑这个 CLI，所有需要的东西都能用环境变量注入。

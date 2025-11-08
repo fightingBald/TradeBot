@@ -1,38 +1,29 @@
-# Calendar Library (`toolkits/calendar_svc`)
+# 日历底层库说明（`toolkits/calendar_svc`）
 
-该目录只包含**库代码**，供脚本或其他服务调用。CLI/运行脚本全部移到了
-`py_scripts/calendar/`，若需要命令行用法请阅读那里的 README。
+## 为啥单独拆成库？
+CLI、服务、notebook 都得复用同一套逻辑：抓财报、拼宏观事件、清洗后输出到 ICS/Google/iCloud。所以这里只放“纯业务逻辑”，不掺命令行解析，让其它层随便调用。
 
-## 模块概览
+## 模块速查表
 
-| 模块            | 说明                                                                          |
-| --------------- | ----------------------------------------------------------------------------- |
-| `defaults.py`   | 默认常量（超时、时区、事件时长、Session 映射等）。                            |
-| `domain.py`     | `EarningsEvent` 数据结构、去重与辅助函数。                                    |
-| `providers.py`  | FMP / Finnhub 财报数据抓取适配器。                                            |
-| `macro_events.py` | Benzinga 宏观事件抓取与归一化。                                             |
-| `market_events.py` | 生成四巫日 / OPEX / VIX 等衍生市场事件。                                   |
-| `calendars.py`  | ICS 构建、Google Calendar 写入、iCloud CalDAV 写入。                          |
-| `settings.py`   | 解析 `.env` + 配置文件 + CLI 参数，产出 `RuntimeOptions`。                    |
-| `runner.py`     | 高层编排：`collect_events` → `apply_outputs`，并返回 `RunSummary`。           |
-| `sync_state.py` | 增量同步状态文件读写与 diff 计算。                                            |
-| `logging_utils.py` | 统一 logger。                                                              |
-| `__init__.py`   | 导出所有常用 API，方便上层直接 `from toolkits.calendar_svc import ...`。              |
+| 模块 | 职责 |
+| --- | --- |
+| `defaults.py` | 默认常量（时区、事件时长、会话时间映射等）。 |
+| `domain.py` | `EarningsEvent` 等数据结构 + 去重、排序辅助。 |
+| `providers.py` | FMP / Finnhub 财报抓取适配器。 |
+| `macro_events.py` | Benzinga 宏观数据抓取。 |
+| `market_events.py` | 生成四巫日、OPEX、VIX 交割等补充事件。 |
+| `calendars.py` | 输出渠道：ICS、本地文件、Google、iCloud CalDAV。 |
+| `settings.py` | 统一处理 `.env` + TOML/JSON + CLI 参数，最终拼成 `RuntimeOptions`。 |
+| `runner.py` | 高层编排：抓事件 → 合并去重 → 写入输出 → 产出 `RunSummary`。 |
+| `sync_state.py` | Google 增量同步状态文件读写。 |
+| `logging_utils.py` | 统一 logger。 |
 
-## 快速示例
-
-以下代码演示如何在自定义脚本中直接调用库 API：
+## 最小示例
 
 ```python
-from datetime import date
+import argparse
 from pathlib import Path
-from toolkits.calendar_svc import (
-    RuntimeOptions,
-    build_runtime_options,
-    load_config,
-    load_env_file,
-    run,
-)
+from toolkits.calendar_svc import build_runtime_options, load_config, load_env_file, run
 
 project_root = Path(__file__).resolve().parents[1]
 load_env_file(".env", search_root=project_root)
@@ -66,25 +57,17 @@ args = argparse.Namespace(
     icloud_insert=False,
     icloud_id=None,
     icloud_app_pass=None,
-    env_file=None,
-    config=None,
-    log_level="INFO",
 )
 
-options: RuntimeOptions = build_runtime_options(
-    args,
-    config_data,
-    config_base=config_base,
-    project_root=project_root,
-)
-
+options = build_runtime_options(args, config_data, config_base=config_base, project_root=project_root)
 summary = run(options)
-print("Fetched", len(summary.events), "events")
+print(f"共处理 {len(summary.events)} 条事件")
 ```
 
-或者只想单独取宏观事件：
+只想单独抓宏观事件，也能直接调用：
 
 ```python
+from datetime import date
 from toolkits.calendar_svc import RuntimeOptions, fetch_macro_events
 
 options = RuntimeOptions(
@@ -108,41 +91,37 @@ options = RuntimeOptions(
     icloud_app_pass=None,
     macro_events=True,
     macro_event_keywords=[],
+    macro_event_source="benzinga",
     incremental_sync=False,
     sync_state_path=None,
 )
 
-macros = fetch_macro_events(date(2025, 1, 1), date(2025, 1, 31), options)
-for event in macros:
-    print(event.summary(), event.notes)
+events = fetch_macro_events(date(2025, 1, 1), date(2025, 1, 31), options)
+for evt in events:
+    print(evt.summary(), evt.notes)
 ```
 
-若只想把手头的 `EarningsEvent` 写进 Google Calendar，可以直接使用
-`GoogleCalendarConfig`：
+写 Google Calendar 只想靠底层 API 也行：
 
 ```python
 from toolkits.calendar_svc import GoogleCalendarConfig, google_insert
 
-config = GoogleCalendarConfig(
+cfg = GoogleCalendarConfig(
     calendar_name="Company Earnings",
     create_if_missing=True,
     creds_path="secrets/credentials.json",
     token_path="secrets/token.json",
 )
-calendar_id = google_insert(events, config=config)
-print("Inserted events into", calendar_id)
+calendar_id = google_insert(events, config=cfg)
+print("成功写入日历：", calendar_id)
 ```
 
-## 依赖注入与运行环境
+## 运行前需要的环境
+- `FMP_API_KEY` / `FINNHUB_API_KEY` / `BENZINGA_API_KEY`：按需提供。
+- `GOOGLE_*`：写 Google 时要指定 credentials/token/calendar。
+- `ICLOUD_*`：走 CalDAV 时要 Apple ID + App Password。
+- 建议用 `load_env_file()` 读取 `.env`，减少硬编码。
 
-- HTTP 请求依赖外部 `FMP_API_KEY`、`FINNHUB_API_KEY`、`BENZINGA_API_KEY` 等环境变量。
-- `load_env_file()` 可读取 `.env` 风格文件，在脚本/测试里注入变量。
-- `build_runtime_options()` 是连接 CLI 参数、配置文件与 `.env` 的统一入口。即便不使用官方脚本，也建议借助它来生成 `RuntimeOptions`。
-- 写入 Google / iCloud 时，需要 `calendars.google_insert()`、`calendars.icloud_caldav_insert()` 所需的证书/凭据，调用者需自行准备。
-
-## 相关脚本
-
-- `py_scripts/calendar/run.py`：官方 CLI 封装，演示如何组装 `.env + TOML + CLI` 并调用 `run()`。
-- `py_scripts/calendar/README.md`：包含所有命令行参数说明、示例命令及 `.env` / 配置文件模板。
-
-本目录不会包含任何“命令行入口”或“环境配置”说明，保证其始终作为纯库存在。如需扩展 CLI，请在 `py_scripts/` 下新增脚本并调用这里导出的 API。 
+## 和 CLI 的关系
+- 官方 CLI 在 `py_scripts/calendar/run.py`，里面只是做参数解析，最后还是调 `runner.run()`。
+- 想扩展自己的 CLI 或服务，只要 import 这些模块即可，不需要复制粘贴逻辑。
