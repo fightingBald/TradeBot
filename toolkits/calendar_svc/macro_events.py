@@ -10,8 +10,11 @@ from zoneinfo import ZoneInfo
 
 import requests
 
-from .defaults import (DEFAULT_EVENT_DURATION_MINUTES, DEFAULT_TIMEOUT_SECONDS,
-                       USER_AGENT)
+from .defaults import (
+    DEFAULT_EVENT_DURATION_MINUTES,
+    DEFAULT_TIMEOUT_SECONDS,
+    USER_AGENT,
+)
 from .domain import EarningsEvent
 from .logging_utils import get_logger
 from .settings import RuntimeOptions

@@ -8,25 +8,26 @@ import json
 import logging
 import os
 import shutil
+from pathlib import Path
 from typing import Dict, Iterable, List, Sequence
 
-from toolkits.ark.holdings import (FUND_CSV, HoldingSnapshot, diff_snapshots,
-                                   fetch_holdings_snapshot)
+from toolkits.ark.holdings import (
+    FUND_CSV,
+    HoldingSnapshot,
+    diff_snapshots,
+    fetch_holdings_snapshot,
+)
 from toolkits.ark.holdings.diff import HoldingChange
-from toolkits.ark.holdings.io import (load_snapshot_folder,
-                                      snapshot_collection_to_folder)
-from toolkits.notifications import (EmailAttachment, EmailDeliveryError,
-                                    EmailNotificationService, EmailSettings,
-                                    RecipientConfig, load_recipient_config)
+from toolkits.ark.holdings.io import load_snapshot_folder, snapshot_collection_to_folder
+from toolkits.notifications import (
+    EmailAttachment,
+    EmailDeliveryError,
+    EmailNotificationService,
+    EmailSettings,
+    RecipientConfig,
+    load_recipient_config,
+)
 
-from toolkits.ark.holdings import (FUND_CSV, HoldingSnapshot, diff_snapshots,
-                                   fetch_holdings_snapshot)
-from toolkits.ark.holdings.diff import HoldingChange
-from toolkits.ark.holdings.io import (load_snapshot_folder,
-                                      snapshot_collection_to_folder)
-from toolkits.notifications import (EmailAttachment, EmailDeliveryError,
-                                    EmailNotificationService, EmailSettings,
-                                    RecipientConfig, load_recipient_config)
 
 logger = logging.getLogger("ark_pipeline")
 
@@ -265,12 +266,23 @@ def change_to_dict(change: HoldingChange) -> Dict[str, object]:
 
 
 def _is_meaningful_change(change) -> bool:
-    ticker = (getattr(change, "ticker", None) or change.get("ticker") if isinstance(change, dict) else ""
+    ticker = (
+        getattr(change, "ticker", None) or change.get("ticker")
+        if isinstance(change, dict)
+        else ""
     ).strip()
     if not ticker or ticker.upper() == "NAN":
         return False
-    weight_val = getattr(change, "weight_change", None) if not isinstance(change, dict) else change.get("weight_change")
-    shares_val = getattr(change, "shares_change", None) if not isinstance(change, dict) else change.get("shares_change")
+    weight_val = (
+        getattr(change, "weight_change", None)
+        if not isinstance(change, dict)
+        else change.get("weight_change")
+    )
+    shares_val = (
+        getattr(change, "shares_change", None)
+        if not isinstance(change, dict)
+        else change.get("shares_change")
+    )
     weight = abs(weight_val or 0.0)
     shares = abs(shares_val or 0.0)
     return weight > 1e-9 or shares >= 1.0
@@ -336,7 +348,9 @@ def _aggregate_changes(
                 }
             )
     aggregated = list(buckets.values())
-    aggregated.sort(key=lambda entry: abs(entry.get("weight_change_net") or 0.0), reverse=True)
+    aggregated.sort(
+        key=lambda entry: abs(entry.get("weight_change_net") or 0.0), reverse=True
+    )
     return aggregated
 
 
@@ -373,9 +387,16 @@ def _render_report_section(report: dict) -> List[str]:
     lines.append(f"- 清仓标的：{len(exited_positions)} 个")
 
     if report["changes"]:
+        table_entries = []
+        for change in report["changes"]:
+            copied = dict(change)
+            copied.setdefault("etf", report["etf"])
+            table_entries.append(copied)
         lines.append("")
         lines.append("### 持仓变化（按权重绝对值排序）")
-        lines.extend(_render_markdown_table(_build_table_rows(report["changes"], include_etf=True)))
+        lines.extend(
+            _render_markdown_table(_build_table_rows(table_entries, include_etf=True))
+        )
     else:
         lines.append("")
         lines.append("> 无超过阈值的增减持。")
@@ -384,18 +405,27 @@ def _render_report_section(report: dict) -> List[str]:
     return lines
 
 
-def _build_table_rows(entries: Sequence[dict], *, include_etf: bool = False, include_flags: bool = False) -> List[List[str]]:
-    header = ["Ticker", "Company", "Action", "Shares Δ", "Weight Δ (abs)", "MV Δ (abs)", "Net Weight Δ", "Net MV Δ"]
-    if include_etf:
-        header.append("ETF")
-    if include_flags:
-        header.extend(["新进?", "清仓?"])
-
-    rows: List[List[str]] = [
-        [f"| {' | '.join(header)} |"]
+def _build_table_rows(
+    entries: Sequence[dict], *, include_etf: bool = False, include_flags: bool = False
+) -> List[List[str]]:
+    columns = [
+        "Ticker",
+        "Company",
+        "Action",
+        "Shares Δ",
+        "Weight Δ (abs)",
+        "MV Δ (abs)",
+        "Net Weight Δ",
+        "Net MV Δ",
     ]
-    separator = "| " + " | ".join(["---"] * len(header)) + " |"
-    rows.append([separator])
+    if include_etf:
+        columns.append("ETF")
+    if include_flags:
+        columns.extend(["新进?", "清仓?"])
+
+    lines: List[str] = []
+    lines.append("| " + " | ".join(columns) + " |")
+    lines.append("| " + " | ".join(["---"] * len(columns)) + " |")
 
     for entry in entries:
         shares_abs = _display_delta(entry, "shares_change")
@@ -416,12 +446,20 @@ def _build_table_rows(entries: Sequence[dict], *, include_etf: bool = False, inc
             mv_net_display,
         ]
         if include_etf:
-            row.append(entry.get("etf", "-"))
+            etf_value = entry.get("etf")
+            if etf_value:
+                row.append(str(etf_value))
+            else:
+                row.append(_format_etf_contribs(entry))
         if include_flags:
             row.append("✅" if entry.get("is_new") else "")
             row.append("✅" if entry.get("is_exit") else "")
-        rows.append(["| " + " | ".join(row) + " |"])
-    return rows
+        lines.append("| " + " | ".join(row) + " |")
+    return lines
+
+
+def _render_markdown_table(lines: Sequence[str]) -> List[str]:
+    return list(lines)
 
 
 def _render_markdown_global(summary: dict) -> List[str]:
@@ -431,19 +469,31 @@ def _render_markdown_global(summary: dict) -> List[str]:
 
     if buys:
         lines.append("### 增持明细")
-        lines.extend(_render_markdown_table(_build_table_rows(buys, include_etf=True, include_flags=True)))
+        lines.extend(
+            _render_markdown_table(
+                _build_table_rows(buys, include_etf=True, include_flags=True)
+            )
+        )
         lines.append("")
     else:
         lines.append("- 增持：无显著变动")
 
     if sells:
         lines.append("### 减持明细")
-        lines.extend(_render_markdown_table(_build_table_rows(sells, include_etf=True, include_flags=True)))
+        lines.extend(
+            _render_markdown_table(
+                _build_table_rows(sells, include_etf=True, include_flags=True)
+            )
+        )
         lines.append("")
     else:
         lines.append("- 减持：无显著变动")
 
     return lines
+
+
+def _render_markdown_table(lines: Sequence[str]) -> List[str]:
+    return list(lines)
 
 
 def _json_default(value):

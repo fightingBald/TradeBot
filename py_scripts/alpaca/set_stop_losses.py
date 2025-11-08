@@ -4,18 +4,8 @@ from __future__ import annotations
 
 import argparse
 import logging
-import sys
 from decimal import ROUND_HALF_UP, Decimal
 from typing import Dict, Iterable
-
-from pathlib import Path
-
-ROOT = Path(__file__).resolve().parents[2]
-if str(ROOT) not in sys.path:
-    sys.path.insert(0, str(ROOT))
-LIB_DIR = ROOT / "toolkits"
-if LIB_DIR.exists() and str(LIB_DIR) not in sys.path:
-    sys.path.insert(0, str(LIB_DIR))
 
 from alpaca.trading.client import TradingClient  # type: ignore  # noqa: E402
 from alpaca.trading.enums import (  # type: ignore  # noqa: E402
@@ -60,7 +50,9 @@ def _is_long_position(position: UserPosition) -> bool:
     return position.side.lower() == "long"
 
 
-def _collect_managed_stop_orders(trading_client: TradingClient, symbols: Iterable[str]) -> Dict[str, object]:
+def _collect_managed_stop_orders(
+    trading_client: TradingClient, symbols: Iterable[str]
+) -> Dict[str, object]:
     request = GetOrdersRequest(
         status=QueryOrderStatus.OPEN,
         nested=True,
@@ -78,13 +70,23 @@ def _collect_managed_stop_orders(trading_client: TradingClient, symbols: Iterabl
     return managed
 
 
-def apply_stop_losses(trading_client: TradingClient, *, stop_pct: Decimal, tolerance_pct: Decimal, dry_run: bool = False) -> None:
+def apply_stop_losses(
+    trading_client: TradingClient,
+    *,
+    stop_pct: Decimal,
+    tolerance_pct: Decimal,
+    dry_run: bool = False,
+) -> None:
     positions_raw = trading_client.get_all_positions()
     positions = [UserPosition.from_alpaca(pos) for pos in positions_raw]
     symbols = [pos.symbol for pos in positions]
     managed_orders = _collect_managed_stop_orders(trading_client, symbols)
 
-    logger.info("Found %d open positions, %d managed stop orders", len(positions), len(managed_orders))
+    logger.info(
+        "Found %d open positions, %d managed stop orders",
+        len(positions),
+        len(managed_orders),
+    )
 
     for position in positions:
         if not _is_long_position(position):
@@ -127,7 +129,9 @@ def apply_stop_losses(trading_client: TradingClient, *, stop_pct: Decimal, toler
                 )
             else:
                 trading_client.cancel_order_by_id(existing_order.id)
-                logger.info("Cancelled order %s for %s", existing_order.id, position.symbol)
+                logger.info(
+                    "Cancelled order %s for %s", existing_order.id, position.symbol
+                )
 
         if dry_run:
             logger.info(
@@ -157,7 +161,9 @@ def apply_stop_losses(trading_client: TradingClient, *, stop_pct: Decimal, toler
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Apply stop-loss orders to all Alpaca positions.")
+    parser = argparse.ArgumentParser(
+        description="Apply stop-loss orders to all Alpaca positions."
+    )
     parser.add_argument(
         "--stop-pct",
         type=float,
@@ -170,10 +176,17 @@ def main() -> None:
         default=0.005,
         help="Relative tolerance before replacing existing stop (default: 0.005 = 0.5%%).",
     )
-    parser.add_argument("--dry-run", action="store_true", help="Log planned actions without submitting orders.")
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Log planned actions without submitting orders.",
+    )
     args = parser.parse_args()
 
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s [set_stop_losses] %(message)s")
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s %(levelname)s [set_stop_losses] %(message)s",
+    )
     settings = get_settings()
     trading_client = TradingClient(
         settings.api_key,

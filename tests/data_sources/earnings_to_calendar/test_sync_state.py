@@ -2,8 +2,12 @@ from datetime import date, datetime
 from zoneinfo import ZoneInfo
 
 from toolkits.calendar_svc.domain import EarningsEvent
-from toolkits.calendar_svc import (build_sync_state, diff_events,
-                                   load_sync_state, save_sync_state)
+from toolkits.calendar_svc import (
+    build_sync_state,
+    diff_events,
+    load_sync_state,
+    save_sync_state,
+)
 
 
 def _sample_event(symbol: str = "AAPL", *, notes: str | None = None) -> EarningsEvent:

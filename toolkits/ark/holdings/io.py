@@ -57,13 +57,13 @@ def dataframe_to_snapshot(df: pd.DataFrame) -> HoldingSnapshot:
             Holding(
                 as_of=as_of,
                 etf=etf,
-            company=_normalize_str(row.get("company")),
-            ticker=_normalize_str(row.get("ticker")).upper(),
-            cusip=_normalize_optional_str(row.get("cusip")),
+                company=_normalize_str(row.get("company")),
+                ticker=_normalize_str(row.get("ticker")).upper(),
+                cusip=_normalize_optional_str(row.get("cusip")),
                 shares=_maybe_float(row.get("shares")),
                 market_value=_maybe_float(row.get("market_value")),
                 weight=_maybe_float(row.get("weight")),
-            price=_maybe_float(row.get("price")),
+                price=_maybe_float(row.get("price")),
             )
         )
 

@@ -6,12 +6,14 @@ from datetime import date
 import pytest
 
 from toolkits.ark.holdings import Holding, HoldingSnapshot, diff_snapshots
-from py_scripts.ark_holdings.daily_pipeline import (_build_etf_report,
-                                                    _build_global_summary,
-                                                    _render_email_html,
-                                                    _resolve_recipients,
-                                                    _sanitize_email_environment,
-                                                    change_to_dict)
+from py_scripts.ark_holdings.daily_pipeline import (
+    _build_etf_report,
+    _build_global_summary,
+    _render_email_html,
+    _resolve_recipients,
+    _sanitize_email_environment,
+    change_to_dict,
+)
 
 
 @pytest.fixture()

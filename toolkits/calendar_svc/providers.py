@@ -10,8 +10,12 @@ import httpx
 import numpy as np
 import pandas as pd
 
-from .defaults import (DEFAULT_EVENT_DURATION_MINUTES, DEFAULT_SESSION_TIMES,
-                       DEFAULT_TIMEOUT_SECONDS, USER_AGENT)
+from .defaults import (
+    DEFAULT_EVENT_DURATION_MINUTES,
+    DEFAULT_SESSION_TIMES,
+    DEFAULT_TIMEOUT_SECONDS,
+    USER_AGENT,
+)
 from .domain import EarningsEvent
 from .logging_utils import get_logger
 

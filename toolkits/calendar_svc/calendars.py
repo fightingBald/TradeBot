@@ -104,7 +104,7 @@ def _get_google_service(creds_path: str, token_path: str):
     """
     from google.auth.transport.requests import Request
     from google.oauth2.credentials import Credentials
-    from google_auth_oauthtoolkits.flow import InstalledAppFlow
+    from google_auth_oauthlib.flow import InstalledAppFlow
     from googleapiclient.discovery import build
 
     scopes = ["https://www.googleapis.com/auth/calendar"]
@@ -295,7 +295,6 @@ def icloud_caldav_insert(
     需要 Apple app-specific password（非你的登录密码）。iCloud CalDAV 主机 caldav.icloud.com。
     会创建一个名为 Earnings 的日历并写入事件。
     """
-    import caldav
     from caldav import DAVClient
 
     client = DAVClient(

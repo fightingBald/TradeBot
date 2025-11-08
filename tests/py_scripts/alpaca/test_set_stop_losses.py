@@ -15,7 +15,9 @@ from py_scripts.alpaca.set_stop_losses import (
 
 
 class DummyOrder:
-    def __init__(self, symbol: str, stop_price: float, client_order_id: str, order_id: str):
+    def __init__(
+        self, symbol: str, stop_price: float, client_order_id: str, order_id: str
+    ):
         self.symbol = symbol
         self.stop_price = stop_price
         self.client_order_id = client_order_id
@@ -73,7 +75,9 @@ def test_compute_stop_price():
 
 def test_apply_stop_losses_submits_order_when_missing():
     client = DummyTradingClient(positions=[_position("AAPL", 110.0)], open_orders=[])
-    apply_stop_losses(client, stop_pct=Decimal("0.03"), tolerance_pct=Decimal("0.005"), dry_run=False)
+    apply_stop_losses(
+        client, stop_pct=Decimal("0.03"), tolerance_pct=Decimal("0.005"), dry_run=False
+    )
     assert client.submitted
     order = client.submitted[0]
     assert order["symbol"] == "AAPL"
@@ -85,19 +89,37 @@ def test_apply_stop_losses_submits_order_when_missing():
 
 
 def test_apply_stop_losses_skips_when_existing_within_tolerance():
-    existing = DummyOrder("AAPL", stop_price=106.9, client_order_id=f"{STOP_ORDER_PREFIX}AAPL", order_id="order-1")
-    client = DummyTradingClient(positions=[_position("AAPL", 110.0)], open_orders=[existing])
+    existing = DummyOrder(
+        "AAPL",
+        stop_price=106.9,
+        client_order_id=f"{STOP_ORDER_PREFIX}AAPL",
+        order_id="order-1",
+    )
+    client = DummyTradingClient(
+        positions=[_position("AAPL", 110.0)], open_orders=[existing]
+    )
 
-    apply_stop_losses(client, stop_pct=Decimal("0.03"), tolerance_pct=Decimal("0.02"), dry_run=False)
+    apply_stop_losses(
+        client, stop_pct=Decimal("0.03"), tolerance_pct=Decimal("0.02"), dry_run=False
+    )
     assert not client.cancelled
     assert not client.submitted
 
 
 def test_apply_stop_losses_replaces_when_out_of_tolerance():
-    existing = DummyOrder("AAPL", stop_price=90.0, client_order_id=f"{STOP_ORDER_PREFIX}AAPL", order_id="order-1")
-    client = DummyTradingClient(positions=[_position("AAPL", 110.0)], open_orders=[existing])
+    existing = DummyOrder(
+        "AAPL",
+        stop_price=90.0,
+        client_order_id=f"{STOP_ORDER_PREFIX}AAPL",
+        order_id="order-1",
+    )
+    client = DummyTradingClient(
+        positions=[_position("AAPL", 110.0)], open_orders=[existing]
+    )
 
-    apply_stop_losses(client, stop_pct=Decimal("0.03"), tolerance_pct=Decimal("0.005"), dry_run=False)
+    apply_stop_losses(
+        client, stop_pct=Decimal("0.03"), tolerance_pct=Decimal("0.005"), dry_run=False
+    )
 
     assert client.cancelled == ["order-1"]
     assert len(client.submitted) == 1

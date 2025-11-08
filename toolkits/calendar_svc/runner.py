@@ -16,8 +16,13 @@ from .macro_events import fetch_macro_events
 from .market_events import generate_market_events
 from .providers import PROVIDERS, EarningsDataProvider
 from .settings import RuntimeOptions
-from .sync_state import (SyncDiff, build_sync_state, diff_events,
-                         load_sync_state, save_sync_state)
+from .sync_state import (
+    SyncDiff,
+    build_sync_state,
+    diff_events,
+    load_sync_state,
+    save_sync_state,
+)
 
 logger = get_logger()
 
@@ -97,10 +102,7 @@ def _format_google_event_lines(
         return (item.date, start, item.symbol)
 
     sorted_events = sorted(events, key=_event_sort_key)
-    lines = [
-        f"{event.iso_date} | {event.symbol}"
-        for event in sorted_events
-    ]
+    lines = [f"{event.iso_date} | {event.symbol}" for event in sorted_events]
     return "\n".join(f"  {line}" for line in lines)
 
 

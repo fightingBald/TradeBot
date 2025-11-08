@@ -4,21 +4,17 @@ from __future__ import annotations
 
 import argparse
 import logging
+import sys
 from pathlib import Path
 from typing import Sequence
 
-try:
-    from toolkits.calendar_svc.logging_utils import get_logger
-    from toolkits.calendar_svc.runner import run
-    from toolkits.calendar_svc.settings import (
-        build_runtime_options,
-        load_config,
-        load_env_file,
-    )
-except ModuleNotFoundError as exc:  # pragma: no cover - import guard
-    raise SystemExit(
-        "无法导入 toolkits.calendar_svc，请确认已将项目根目录加入 PYTHONPATH"
-    ) from exc
+from toolkits.calendar_svc.logging_utils import get_logger
+from toolkits.calendar_svc.runner import run
+from toolkits.calendar_svc.settings import (
+    build_runtime_options,
+    load_config,
+    load_env_file,
+)
 
 logger = get_logger()
 
@@ -121,11 +117,11 @@ def main(args: Sequence[str] | None = None) -> None:
     )
     logger.debug("Logger initialized with level %s", parsed.log_level.upper())
 
-    project_root = ROOT
+    project_root = Path(__file__).resolve().parents[2]
 
     load_env_file(parsed.env_file, search_root=project_root)
 
-    default_config_path = project_root / "config" / "events_to_google_calendar.toml"
+    default_config_path = project_root / "config" / "earnings_to_calendar.toml"
     config_data, config_base = load_config(
         parsed.config, default_path=default_config_path
     )

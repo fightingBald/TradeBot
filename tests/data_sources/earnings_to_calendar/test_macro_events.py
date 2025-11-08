@@ -99,7 +99,9 @@ def test_fetch_macro_events_includes_high_importance_events(monkeypatch):
     assert fomc.source == "Benzinga-Economic"
     assert fomc.session == "FOMC"
     assert "Importance: 4" in fomc.notes
-    housing = next(evt for evt in events if evt.symbol.startswith("MACRO-HOUSING-STARTS"))
+    housing = next(
+        evt for evt in events if evt.symbol.startswith("MACRO-HOUSING-STARTS")
+    )
     assert housing.session == "HOUSING"
 
 

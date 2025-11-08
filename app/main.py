@@ -14,7 +14,9 @@ templates = Jinja2Templates(directory="app/templates")
 DEFAULT_SYMBOLS = ["AAPL", "GOOGL"]
 
 
-def get_market_data_service(settings: Settings = Depends(get_settings)) -> AlpacaMarketDataService:
+def get_market_data_service(
+    settings: Settings = Depends(get_settings),
+) -> AlpacaMarketDataService:
     """Dependency provider for the Alpaca market data service."""
     return AlpacaMarketDataService(settings)
 
@@ -22,7 +24,9 @@ def get_market_data_service(settings: Settings = Depends(get_settings)) -> Alpac
 @app.get("/", response_class=HTMLResponse)
 async def index(
     request: Request,
-    symbols: Optional[List[str]] = Query(default=None, description="Optional symbols to chart on the heatmap"),
+    symbols: Optional[List[str]] = Query(
+        default=None, description="Optional symbols to chart on the heatmap"
+    ),
 ) -> HTMLResponse:
     tickers = symbols or DEFAULT_SYMBOLS
     return templates.TemplateResponse(
@@ -48,7 +52,9 @@ async def read_quotes(
     try:
         quotes = service.get_latest_quotes(tickers)
     except RuntimeError as exc:
-        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)
+        ) from exc
 
     if not quotes:
         raise HTTPException(
@@ -65,11 +71,15 @@ async def read_quotes(
     status_code=status.HTTP_200_OK,
     response_model=List[UserPosition],
 )
-async def read_positions(service: AlpacaMarketDataService = Depends(get_market_data_service)) -> List[UserPosition]:
+async def read_positions(
+    service: AlpacaMarketDataService = Depends(get_market_data_service),
+) -> List[UserPosition]:
     try:
         positions = service.get_user_positions()
     except RuntimeError as exc:
-        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)
+        ) from exc
 
     return positions
 

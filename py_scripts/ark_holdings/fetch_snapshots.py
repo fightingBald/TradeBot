@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import argparse
-import argparse
+from pathlib import Path
 
 from toolkits.ark.holdings import FUND_CSV, fetch_holdings_snapshot
 from toolkits.ark.holdings.io import snapshot_to_dataframe

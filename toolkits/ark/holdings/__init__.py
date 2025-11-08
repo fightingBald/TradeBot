@@ -2,8 +2,12 @@
 
 from .diff import HoldingChange, diff_snapshots, summarize_changes
 from .domain import Holding, HoldingSnapshot
-from .provider import (FUND_CSV, fetch_all_snapshots, fetch_holdings_csv,
-                       fetch_holdings_snapshot)
+from .provider import (
+    FUND_CSV,
+    fetch_all_snapshots,
+    fetch_holdings_csv,
+    fetch_holdings_snapshot,
+)
 
 __all__ = [
     "FUND_CSV",

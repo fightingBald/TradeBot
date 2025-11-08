@@ -2,10 +2,11 @@ from datetime import date, datetime, timedelta
 from zoneinfo import ZoneInfo
 
 from toolkits.calendar_svc import (
-    DEFAULT_EVENT_DURATION_MINUTES, DEFAULT_SESSION_TIMES,
-    DEFAULT_SOURCE_TIMEZONE)
-from toolkits.calendar_svc.providers import (FinnhubEarningsProvider,
-                                             FmpEarningsProvider)
+    DEFAULT_EVENT_DURATION_MINUTES,
+    DEFAULT_SESSION_TIMES,
+    DEFAULT_SOURCE_TIMEZONE,
+)
+from toolkits.calendar_svc.providers import FinnhubEarningsProvider, FmpEarningsProvider
 
 from .conftest import StubResponse
 

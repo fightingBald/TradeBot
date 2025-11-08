@@ -172,7 +172,7 @@ class EmailNotificationService:
                     recipients,
                 )
                 return
-            except (smtptoolkits.SMTPException, OSError) as exc:
+            except (smtplib.SMTPException, OSError) as exc:
                 last_error = exc
                 logger.warning(
                     "发送邮件失败（第 %d/%d 次尝试）：%s",
@@ -184,16 +184,16 @@ class EmailNotificationService:
 
     def _send_via_smtp(self, message: EmailMessage, recipients: Iterable[str]) -> None:
         context = ssl.create_default_context()
-        smtp: smtptoolkits.SMTP
+        smtp: smtplib.SMTP
         if self._settings.use_ssl:
-            smtp = smtptoolkits.SMTP_SSL(
+            smtp = smtplib.SMTP_SSL(
                 self._settings.host,
                 self._settings.port,
                 timeout=self._settings.timeout,
                 context=context,
             )
         else:
-            smtp = smtptoolkits.SMTP(
+            smtp = smtplib.SMTP(
                 self._settings.host,
                 self._settings.port,
                 timeout=self._settings.timeout,

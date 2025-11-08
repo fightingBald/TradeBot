@@ -10,9 +10,13 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Mapping
 
-from .defaults import (DEFAULT_EVENT_DURATION_MINUTES, DEFAULT_LOOKAHEAD_DAYS,
-                       DEFAULT_SESSION_TIMES, DEFAULT_SOURCE_TIMEZONE,
-                       DEFAULT_TARGET_TIMEZONE)
+from .defaults import (
+    DEFAULT_EVENT_DURATION_MINUTES,
+    DEFAULT_LOOKAHEAD_DAYS,
+    DEFAULT_SESSION_TIMES,
+    DEFAULT_SOURCE_TIMEZONE,
+    DEFAULT_TARGET_TIMEZONE,
+)
 from .logging_utils import get_logger
 
 logger = get_logger()
@@ -180,7 +184,7 @@ def load_config(
     try:
         if cfg_path.suffix.lower() == ".toml":
             with cfg_path.open("rb") as handle:
-                data = tomltoolkits.load(handle)
+                data = tomllib.load(handle)
         else:
             with cfg_path.open("r", encoding="utf-8") as handle:
                 data = json.load(handle)
@@ -190,7 +194,7 @@ def load_config(
         return dict(data), cfg_path.parent
     except json.JSONDecodeError as exc:
         raise RuntimeError(f"配置文件解析失败：{config_path}") from exc
-    except tomltoolkits.TOMLDecodeError as exc:
+    except tomllib.TOMLDecodeError as exc:
         raise RuntimeError(f"配置文件解析失败：{config_path}") from exc
 
 

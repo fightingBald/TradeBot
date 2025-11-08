@@ -73,7 +73,7 @@ Once running, the API provides:
   ```bash
   cd /path/to/AlpacaTrading
   ruff check app tests
-  black --check app tests
+  ruff format --check app tests
   ```
 
 ## Project Layout
@@ -97,7 +97,7 @@ Once running, the API provides:
   ```bash
   cd /path/to/AlpacaTrading
   python py_scripts/calendar/run.py \
-    --config=config/events_to_google_calendar.toml \
+    --config=config/earnings_to_calendar.toml \
     --env-file=.env \
     --google-insert \
     --market-events \

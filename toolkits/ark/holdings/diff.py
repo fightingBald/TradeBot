@@ -128,10 +128,13 @@ def summarize_changes(
         elif change.action in {"exit", "sell"}:
             sells.append(change)
 
-    key = lambda ch: abs(ch.weight_change)
-    buys_sorted = sorted(buys, key=key, reverse=True)[:top_n]
-    sells_sorted = sorted(sells, key=key, reverse=True)[:top_n]
+    buys_sorted = sorted(buys, key=_weight_abs, reverse=True)[:top_n]
+    sells_sorted = sorted(sells, key=_weight_abs, reverse=True)[:top_n]
     return {
         "buys": buys_sorted,
         "sells": sells_sorted,
     }
+
+
+def _weight_abs(change: HoldingChange) -> float:
+    return abs(change.weight_change or 0.0)

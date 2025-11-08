@@ -17,7 +17,7 @@
 | `runner.py`     | 高层编排：`collect_events` → `apply_outputs`，并返回 `RunSummary`。           |
 | `sync_state.py` | 增量同步状态文件读写与 diff 计算。                                            |
 | `logging_utils.py` | 统一 logger。                                                              |
-| `__init__.py`   | 导出所有常用 API，方便上层直接 `from toolkits.calendar_svc_svc import ...`。              |
+| `__init__.py`   | 导出所有常用 API，方便上层直接 `from toolkits.calendar_svc import ...`。              |
 
 ## 快速示例
 
@@ -26,7 +26,7 @@
 ```python
 from datetime import date
 from pathlib import Path
-from toolkits.calendar_svc_svc import (
+from toolkits.calendar_svc import (
     RuntimeOptions,
     build_runtime_options,
     load_config,
@@ -38,8 +38,8 @@ project_root = Path(__file__).resolve().parents[1]
 load_env_file(".env", search_root=project_root)
 
 config_data, config_base = load_config(
-    "config/events_to_google_calendar.toml",
-    default_path=project_root / "config" / "events_to_google_calendar.toml",
+    "config/earnings_to_calendar.toml",
+    default_path=project_root / "config" / "earnings_to_calendar.toml",
 )
 
 args = argparse.Namespace(
@@ -85,7 +85,7 @@ print("Fetched", len(summary.events), "events")
 或者只想单独取宏观事件：
 
 ```python
-from toolkits.calendar_svc_svc import RuntimeOptions, fetch_macro_events
+from toolkits.calendar_svc import RuntimeOptions, fetch_macro_events
 
 options = RuntimeOptions(
     symbols=["AAPL"],

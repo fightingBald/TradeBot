@@ -9,16 +9,16 @@ install:
 	$(PYTHON) -m pip install -r requirements.txt
 
 build:
-	$(PYTHON) -m compileall app lib py_scripts
+	$(PYTHON) -m compileall app toolkits py_scripts
 
 test:
 	$(ACTIVATE) && pytest
 
 format:
-	$(ACTIVATE) && black app lib py_scripts tests
+	$(ACTIVATE) && ruff check --fix app toolkits py_scripts tests && ruff format app toolkits py_scripts tests
 
 lint:
-	$(ACTIVATE) && ruff check app lib py_scripts tests
+	$(ACTIVATE) && ruff check app toolkits py_scripts tests
 
 clean:
 	rm -rf build dist .pytest_cache .mypy_cache htmlcov coverage .ruff_cache
