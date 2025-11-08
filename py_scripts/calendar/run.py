@@ -4,24 +4,21 @@ from __future__ import annotations
 
 import argparse
 import logging
-import sys
 from pathlib import Path
 from typing import Sequence
 
-ROOT = Path(__file__).resolve().parents[2]
-if str(ROOT) not in sys.path:
-    sys.path.insert(0, str(ROOT))
-LIB_DIR = ROOT / "toolkits"
-if LIB_DIR.exists() and str(LIB_DIR) not in sys.path:
-    sys.path.insert(0, str(LIB_DIR))
-
-from toolkits.calendar_svc.logging_utils import get_logger  # noqa: E402
-from toolkits.calendar_svc.runner import run  # noqa: E402
-from toolkits.calendar_svc.settings import (  # noqa: E402
-    build_runtime_options,
-    load_config,
-    load_env_file,
-)
+try:
+    from toolkits.calendar_svc.logging_utils import get_logger
+    from toolkits.calendar_svc.runner import run
+    from toolkits.calendar_svc.settings import (
+        build_runtime_options,
+        load_config,
+        load_env_file,
+    )
+except ModuleNotFoundError as exc:  # pragma: no cover - import guard
+    raise SystemExit(
+        "无法导入 toolkits.calendar_svc，请确认已将项目根目录加入 PYTHONPATH"
+    ) from exc
 
 logger = get_logger()
 

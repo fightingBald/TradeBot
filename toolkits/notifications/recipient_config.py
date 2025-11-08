@@ -45,9 +45,9 @@ def load_recipient_config(path: str | Path | None = None) -> RecipientConfig:
     if not file_path.exists():
         raise FileNotFoundError(f"找不到收件人配置文件：{file_path}")
     try:
-        data = tomllib.loads(file_path.read_text(encoding="utf-8"))
+        data = tomltoolkits.loads(file_path.read_text(encoding="utf-8"))
     except (
-        tomllib.TOMLDecodeError
+        tomltoolkits.TOMLDecodeError
     ) as exc:  # pragma: no cover - unlikely when file is valid TOML
         raise ValueError(f"收件人配置解析失败：{file_path}") from exc
     return RecipientConfig.model_validate(data)

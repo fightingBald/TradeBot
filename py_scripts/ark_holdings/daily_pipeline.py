@@ -8,16 +8,16 @@ import json
 import logging
 import os
 import shutil
-import sys
-from pathlib import Path
 from typing import Dict, Iterable, List, Sequence
 
-ROOT = Path(__file__).resolve().parents[2]
-if str(ROOT) not in sys.path:
-    sys.path.insert(0, str(ROOT))
-LIB_DIR = ROOT / "toolkits"
-if LIB_DIR.exists() and str(LIB_DIR) not in sys.path:
-    sys.path.insert(0, str(LIB_DIR))
+from toolkits.ark.holdings import (FUND_CSV, HoldingSnapshot, diff_snapshots,
+                                   fetch_holdings_snapshot)
+from toolkits.ark.holdings.diff import HoldingChange
+from toolkits.ark.holdings.io import (load_snapshot_folder,
+                                      snapshot_collection_to_folder)
+from toolkits.notifications import (EmailAttachment, EmailDeliveryError,
+                                    EmailNotificationService, EmailSettings,
+                                    RecipientConfig, load_recipient_config)
 
 from toolkits.ark.holdings import (FUND_CSV, HoldingSnapshot, diff_snapshots,
                                    fetch_holdings_snapshot)
@@ -264,22 +264,17 @@ def change_to_dict(change: HoldingChange) -> Dict[str, object]:
     }
 
 
-def _is_meaningful_change(change: HoldingChange) -> bool:
-    ticker = (change.ticker or "").strip()
+def _is_meaningful_change(change) -> bool:
+    ticker = (getattr(change, "ticker", None) or change.get("ticker") if isinstance(change, dict) else ""
+    ).strip()
     if not ticker or ticker.upper() == "NAN":
         return False
-    weight = abs(change.weight_change or 0.0)
-    shares = abs(change.shares_change or 0.0)
+    weight_val = getattr(change, "weight_change", None) if not isinstance(change, dict) else change.get("weight_change")
+    shares_val = getattr(change, "shares_change", None) if not isinstance(change, dict) else change.get("shares_change")
+    weight = abs(weight_val or 0.0)
+    shares = abs(shares_val or 0.0)
     return weight > 1e-9 or shares >= 1.0
 
-
-def _is_meaningful_change_dict(change: dict) -> bool:
-    ticker = (change.get("ticker") or "").strip()
-    if not ticker or ticker.upper() == "NAN":
-        return False
-    weight = abs(change.get("weight_change") or 0.0)
-    shares = abs(change.get("shares_change") or 0.0)
-    return weight > 1e-9 or shares >= 1.0
 
 def _build_global_summary(reports: Sequence[dict]) -> dict:
     buys = _aggregate_changes(reports, {"new", "buy"}, aggregate_action="buy")
@@ -298,7 +293,7 @@ def _aggregate_changes(
         for change in report["changes"]:
             if change.get("action") not in actions:
                 continue
-            if not _is_meaningful_change_dict(change):
+            if not _is_meaningful_change(change):
                 continue
             shares_delta = abs(change.get("shares_change") or 0.0)
             if shares_delta < 1.0:
@@ -380,7 +375,7 @@ def _render_report_section(report: dict) -> List[str]:
     if report["changes"]:
         lines.append("")
         lines.append("### 持仓变化（按权重绝对值排序）")
-        lines.extend(_format_table(report["changes"]))
+        lines.extend(_render_markdown_table(_build_table_rows(report["changes"], include_etf=True)))
     else:
         lines.append("")
         lines.append("> 无超过阈值的增减持。")
@@ -389,10 +384,19 @@ def _render_report_section(report: dict) -> List[str]:
     return lines
 
 
-def _format_table(entries: Sequence[dict]) -> List[str]:
-    header = "| Ticker | Company | Action | Shares Δ | Weight Δ (abs) | MV Δ (abs) | Net Weight Δ | Net MV Δ | ETF |"
-    separator = "| --- | --- | --- | --- | --- | --- | --- | --- | --- |"
-    rows = [header, separator]
+def _build_table_rows(entries: Sequence[dict], *, include_etf: bool = False, include_flags: bool = False) -> List[List[str]]:
+    header = ["Ticker", "Company", "Action", "Shares Δ", "Weight Δ (abs)", "MV Δ (abs)", "Net Weight Δ", "Net MV Δ"]
+    if include_etf:
+        header.append("ETF")
+    if include_flags:
+        header.extend(["新进?", "清仓?"])
+
+    rows: List[List[str]] = [
+        [f"| {' | '.join(header)} |"]
+    ]
+    separator = "| " + " | ".join(["---"] * len(header)) + " |"
+    rows.append([separator])
+
     for entry in entries:
         shares_abs = _display_delta(entry, "shares_change")
         weight_abs = _display_delta(entry, "weight_change")
@@ -401,11 +405,22 @@ def _format_table(entries: Sequence[dict]) -> List[str]:
         weight_net = entry.get("weight_change") or 0.0
         mv_net = entry.get("market_value_change")
         mv_net_display = f"${mv_net:,.0f}" if mv_net is not None else "N/A"
-        rows.append(
-            f"| {entry['ticker']} | {entry['company']} | {entry['action']} | "
-            f"{shares_abs:,.0f} | {weight_abs:.4f} | {mv_abs_display} | "
-            f"{weight_net:+.4f} | {mv_net_display} | {entry.get('etf')} |"
-        )
+        row = [
+            entry.get("ticker", "-"),
+            entry.get("company", "-"),
+            entry.get("action", "-"),
+            f"{shares_abs:,.0f}",
+            f"{weight_abs:.4f}",
+            mv_abs_display,
+            f"{float(weight_net):+.4f}",
+            mv_net_display,
+        ]
+        if include_etf:
+            row.append(entry.get("etf", "-"))
+        if include_flags:
+            row.append("✅" if entry.get("is_new") else "")
+            row.append("✅" if entry.get("is_exit") else "")
+        rows.append(["| " + " | ".join(row) + " |"])
     return rows
 
 
@@ -416,54 +431,19 @@ def _render_markdown_global(summary: dict) -> List[str]:
 
     if buys:
         lines.append("### 增持明细")
-        lines.extend(_format_global_table(buys, include_new=True))
+        lines.extend(_render_markdown_table(_build_table_rows(buys, include_etf=True, include_flags=True)))
         lines.append("")
     else:
         lines.append("- 增持：无显著变动")
 
     if sells:
         lines.append("### 减持明细")
-        lines.extend(_format_global_table(sells, include_exit=True))
+        lines.extend(_render_markdown_table(_build_table_rows(sells, include_etf=True, include_flags=True)))
         lines.append("")
     else:
         lines.append("- 减持：无显著变动")
 
     return lines
-
-
-def _format_global_table(
-    entries: Sequence[dict],
-    *,
-    include_new: bool = False,
-    include_exit: bool = False,
-) -> List[str]:
-    header = "| Ticker | Company | Action | Shares Δ | Weight Δ (abs) | MV Δ (abs) | Net Weight Δ | Net MV Δ | ETF |"
-    if include_new or include_exit:
-        header = header[:-1] + (" 新进? |" if include_new else " 清仓? |")
-        separator = "| --- | --- | --- | --- | --- | --- | --- | --- | --- |"
-    else:
-        separator = "| --- | --- | --- | --- | --- | --- | --- | --- |"
-    rows = [header, separator]
-    for entry in entries:
-        shares = entry.get("shares_change") or 0.0
-        weight_abs = entry.get("weight_change_abs") or 0.0
-        mv_abs = entry.get("market_value_change_abs") or 0.0
-        weight_net = entry.get("weight_change_net") or 0.0
-        mv_net = entry.get("market_value_change_net")
-        mv_abs_display = f"${mv_abs:,.0f}"
-        mv_net_display = f"${mv_net:,.0f}" if mv_net is not None else "N/A"
-        indicator = ""
-        if include_new:
-            indicator = "✅" if entry.get("is_new") else ""
-        elif include_exit:
-            indicator = "✅" if entry.get("is_exit") else ""
-        rows.append(
-            f"| {entry['ticker']} | {entry['company']} | {entry['action']} | "
-            f"{shares:,.0f} | {weight_abs:.4f} | {mv_abs_display} | "
-            f"{weight_net:+.4f} | {mv_net_display} | "
-            f"{_format_etf_contribs(entry)} | {indicator} |"
-        )
-    return rows
 
 
 def _json_default(value):

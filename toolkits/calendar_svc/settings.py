@@ -180,7 +180,7 @@ def load_config(
     try:
         if cfg_path.suffix.lower() == ".toml":
             with cfg_path.open("rb") as handle:
-                data = tomllib.load(handle)
+                data = tomltoolkits.load(handle)
         else:
             with cfg_path.open("r", encoding="utf-8") as handle:
                 data = json.load(handle)
@@ -190,7 +190,7 @@ def load_config(
         return dict(data), cfg_path.parent
     except json.JSONDecodeError as exc:
         raise RuntimeError(f"配置文件解析失败：{config_path}") from exc
-    except tomllib.TOMLDecodeError as exc:
+    except tomltoolkits.TOMLDecodeError as exc:
         raise RuntimeError(f"配置文件解析失败：{config_path}") from exc
 
 

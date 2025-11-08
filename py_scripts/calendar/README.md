@@ -1,6 +1,6 @@
 # Calendar CLI (`py_scripts/calendar/run.py`)
 
-该脚本是 `lib/calendar_svc` 的官方命令行入口，负责解析参数、读取配置与 `.env`，最终调用库层完成“抓取财报/宏观事件 → 写入 ICS/Google/iCloud”。
+该脚本是 `toolkits/calendar_svc` 的官方命令行入口，负责解析参数、读取配置与 `.env`，最终调用库层完成“抓取财报/宏观事件 → 写入 ICS/Google/iCloud”。
 
 ## 环境准备
 
@@ -78,5 +78,5 @@ python py_scripts/calendar/run.py \
 
 ## 备注
 
-- 自定义脚本可直接 `import lib.calendar_svc_svc` 调用业务函数；此处 CLI 只是官方示例。
+- 自定义脚本可直接 `import toolkits.calendar_svc_svc` 调用业务函数；此处 CLI 只是官方示例。
 - 如果需要在 CI 中运行，可沿用此脚本，再用环境变量或参数注入配置。 

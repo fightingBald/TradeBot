@@ -1,4 +1,4 @@
-# Calendar Library (`lib/calendar_svc`)
+# Calendar Library (`toolkits/calendar_svc`)
 
 该目录只包含**库代码**，供脚本或其他服务调用。CLI/运行脚本全部移到了
 `py_scripts/calendar/`，若需要命令行用法请阅读那里的 README。
@@ -17,7 +17,7 @@
 | `runner.py`     | 高层编排：`collect_events` → `apply_outputs`，并返回 `RunSummary`。           |
 | `sync_state.py` | 增量同步状态文件读写与 diff 计算。                                            |
 | `logging_utils.py` | 统一 logger。                                                              |
-| `__init__.py`   | 导出所有常用 API，方便上层直接 `from lib.calendar_svc_svc import ...`。              |
+| `__init__.py`   | 导出所有常用 API，方便上层直接 `from toolkits.calendar_svc_svc import ...`。              |
 
 ## 快速示例
 

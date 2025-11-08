@@ -53,7 +53,7 @@ def _serialize_event(event: EarningsEvent) -> Dict[str, object]:
 def _fingerprint_event(event: EarningsEvent) -> str:
     payload = _serialize_event(event)
     raw = json.dumps(payload, sort_keys=True, ensure_ascii=False)
-    return hashlib.sha256(raw.encode("utf-8")).hexdigest()
+    return hashtoolkits.sha256(raw.encode("utf-8")).hexdigest()
 
 
 def diff_events(events: Iterable[EarningsEvent], state: SyncState | None) -> SyncDiff:

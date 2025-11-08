@@ -104,7 +104,7 @@ def _get_google_service(creds_path: str, token_path: str):
     """
     from google.auth.transport.requests import Request
     from google.oauth2.credentials import Credentials
-    from google_auth_oauthlib.flow import InstalledAppFlow
+    from google_auth_oauthtoolkits.flow import InstalledAppFlow
     from googleapiclient.discovery import build
 
     scopes = ["https://www.googleapis.com/auth/calendar"]

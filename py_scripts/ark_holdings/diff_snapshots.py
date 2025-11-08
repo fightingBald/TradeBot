@@ -4,16 +4,6 @@ from __future__ import annotations
 
 import argparse
 
-import sys
-from pathlib import Path
-
-ROOT = Path(__file__).resolve().parents[2]
-if str(ROOT) not in sys.path:
-    sys.path.insert(0, str(ROOT))
-LIB_DIR = ROOT / "toolkits"
-if LIB_DIR.exists() and str(LIB_DIR) not in sys.path:
-    sys.path.insert(0, str(LIB_DIR))
-
 from toolkits.ark.holdings import diff_snapshots, summarize_changes
 from toolkits.ark.holdings.io import load_snapshot_csv
 

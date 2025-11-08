@@ -19,7 +19,7 @@
 2. 代码里这样用：
 
    ```python
-from lib.notifications import EmailNotificationService, EmailSettings
+from toolkits.notifications import EmailNotificationService, EmailSettings
 
    settings = EmailSettings()          # 自动读取 EMAIL_* 配置
    mailer = EmailNotificationService(settings)
@@ -34,7 +34,7 @@ from lib.notifications import EmailNotificationService, EmailSettings
    如果想发 HTML、CC/BCC 或带附件，也可以：
 
    ```python
-from lib.notifications import EmailAttachment
+from toolkits.notifications import EmailAttachment
 
    mailer.send_email(
        subject="每日盈亏汇总",
