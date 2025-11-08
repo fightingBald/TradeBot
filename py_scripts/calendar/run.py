@@ -71,7 +71,7 @@ def main(args: Sequence[str] | None = None) -> None:
 
     load_env_file(parsed.env_file, search_root=project_root)
 
-    default_config_path = project_root / "config" / "earnings_to_calendar.toml"
+    default_config_path = project_root / "config" / "events_to_google_calendar.toml"
     config_data, config_base = load_config(parsed.config, default_path=default_config_path)
 
     try:
