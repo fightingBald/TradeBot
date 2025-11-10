@@ -1,4 +1,4 @@
-# AlpacaTrading 项目说明（大白话）
+# AlpacaTrading 项目说明
 
 ## 这套东西是干嘛的？
 - 一套本地可跑的 FastAPI 服务，实时去 Alpaca 拉行情，顺手画热力图页面。
