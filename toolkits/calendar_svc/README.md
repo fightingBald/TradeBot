@@ -116,6 +116,11 @@ calendar_id = google_insert(events, config=cfg)
 print("成功写入日历：", calendar_id)
 ```
 
+### Google 授权 & token 失效处理
+- 首次写入会弹浏览器做 OAuth，生成的 token 会保存到 `token_path`（默认 `secrets/token.json`）方便复用。
+- 如果 token 过期/被撤销导致 `invalid_grant`，`_get_google_service` 会删除旧 token、自动创建父目录并重新走授权，跑完即可生成新 token。
+- 手工修复也可以：删掉 token 文件后再跑一次带 `--google-insert` 的命令完成重新授权。
+
 ## 运行前需要的环境
 - `FMP_API_KEY` / `FINNHUB_API_KEY` / `BENZINGA_API_KEY`：按需提供。
 - `GOOGLE_*`：写 Google 时要指定 credentials/token/calendar。

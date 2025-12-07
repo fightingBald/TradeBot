@@ -98,5 +98,19 @@ earnings-calendar --symbols=AAPL,MSFT --days=60 --export-ics=earnings.ics
 - 接入 Polymarket
 - 日历里补上 VIX 交割等特别日子，避免踩坑
 - 对接 hypeliquid whale API（https://docs.coinglass.com/reference/hyperliquid-whale-alert）
+  数据源（行情）
 
+- 策略引擎
+
+- 回测模块
+
+- 风控
+
+- 执行层（连接 IBKR/Alpaca）
+
+- 日志系统
+
+- 任务调度、重试逻辑
+
+Kubernetes 运行框架（符合你平时 MDB Marketplace 的风格）
 有其它点子就直接在 README 最后增删，保持这份文档信息最新。***

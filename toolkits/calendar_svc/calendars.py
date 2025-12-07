@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-import os
 import uuid
 from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
 from zoneinfo import ZoneInfo
 
 from .defaults import DEFAULT_EVENT_DURATION_MINUTES, DEFAULT_TARGET_TIMEZONE
@@ -102,6 +102,7 @@ def _get_google_service(creds_path: str, token_path: str):
     需要先在 https://developers.google.com/workspace/calendar/api/quickstart/python 按 Quickstart 下载 OAuth credentials.json
     首次运行会打开浏览器授权，令牌保存在 token.json
     """
+    from google.auth.exceptions import RefreshError
     from google.auth.transport.requests import Request
     from google.oauth2.credentials import Credentials
     from google_auth_oauthlib.flow import InstalledAppFlow
@@ -109,16 +110,25 @@ def _get_google_service(creds_path: str, token_path: str):
 
     scopes = ["https://www.googleapis.com/auth/calendar"]
     creds = None
-    if os.path.exists(token_path):
+    token_file = Path(token_path)
+    if token_file.exists():
         creds = Credentials.from_authorized_user_file(token_path, scopes)
     if not creds or not creds.valid:
         if creds and creds.expired and creds.refresh_token:
-            creds.refresh(Request())
-        else:
+            try:
+                creds.refresh(Request())
+            except RefreshError as exc:
+                logger.warning("刷新 Google 凭证失败（%s），移除失效 token 后重新授权", exc)
+                try:
+                    token_file.unlink(missing_ok=True)
+                except OSError:
+                    logger.debug("删除失效 token 文件失败：%s", token_file, exc_info=exc)
+                creds = None
+        if not creds or not creds.valid:
             flow = InstalledAppFlow.from_client_secrets_file(creds_path, scopes)
             creds = flow.run_local_server(port=0)
-        with open(token_path, "w", encoding="utf-8") as token_file:
-            token_file.write(creds.to_json())
+        token_file.parent.mkdir(parents=True, exist_ok=True)
+        token_file.write_text(creds.to_json(), encoding="utf-8")
 
     return build("calendar", "v3", credentials=creds)
 
