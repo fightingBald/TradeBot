@@ -133,3 +133,58 @@ def test_run_incremental_skips_when_state_matches(tmp_path, monkeypatch):
     assert not google_batches  # 没有再次调用写入
     assert second_summary.sync_stats == {"created": 0, "updated": 0, "skipped": 1, "total": 1}
     assert sync_path.exists()
+
+
+def test_collect_events_uses_fallback_provider(monkeypatch):
+    class PrimaryStub(_StubProvider):
+        def fetch(self, symbols, since, until):
+            return super().fetch(["AAPL"], since, until)  # only returns AAPL
+
+    class FallbackStub(_StubProvider):
+        def fetch(self, symbols, since, until):
+            # Return ORCL only
+            return [
+                EarningsEvent(
+                    symbol="ORCL",
+                    date=date(2024, 3, 15),
+                    session="AMC",
+                    source="Fallback",
+                    timezone="America/New_York",
+                )
+            ]
+
+    monkeypatch.setenv("FMP_API_KEY", "token")
+    monkeypatch.setenv("FINNHUB_API_KEY", "token2")
+    monkeypatch.setitem(providers_mod.PROVIDERS, "fmp", PrimaryStub)
+    monkeypatch.setitem(providers_mod.PROVIDERS, "finnhub", FallbackStub)
+
+    options = RuntimeOptions(
+        symbols=["AAPL", "ORCL"],
+        source="fmp",
+        days=30,
+        export_ics=None,
+        google_insert=False,
+        google_credentials="cred.json",
+        google_token="token.json",
+        google_calendar_id=None,
+        google_calendar_name=None,
+        google_create_calendar=False,
+        source_timezone="America/New_York",
+        target_timezone="America/New_York",
+        event_duration_minutes=60,
+        session_time_map={"AMC": "17:00"},
+        market_events=False,
+        icloud_insert=False,
+        icloud_id=None,
+        icloud_app_pass=None,
+        macro_events=False,
+        macro_event_keywords=[],
+        macro_event_source="benzinga",
+        incremental_sync=False,
+        sync_state_path=None,
+        fallback_source="finnhub",
+    )
+
+    events = runner_mod.collect_events(options, since=date(2024, 3, 1), until=date(2024, 4, 1))
+    symbols = {evt.symbol for evt in events}
+    assert symbols == {"AAPL", "ORCL"}

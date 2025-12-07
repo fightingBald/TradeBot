@@ -40,16 +40,17 @@ class DateWindow:
     until: date
 
 
-def _resolve_provider(options: RuntimeOptions) -> EarningsDataProvider:
-    if options.source not in PROVIDERS:
-        raise ValueError(f"Unsupported data source: {options.source}")
-    env_var = "FMP_API_KEY" if options.source == "fmp" else "FINNHUB_API_KEY"
+def _resolve_provider(options: RuntimeOptions, *, source_override: str | None = None) -> EarningsDataProvider:
+    source = source_override or options.source
+    if source not in PROVIDERS:
+        raise ValueError(f"Unsupported data source: {source}")
+    env_var = "FMP_API_KEY" if source == "fmp" else "FINNHUB_API_KEY"
     api_key = os.getenv(env_var)
     if not api_key:
-        logger.error("环境变量 %s 未配置，无法使用数据源 %s", env_var, options.source)
+        logger.error("环境变量 %s 未配置，无法使用数据源 %s", env_var, source)
         raise RuntimeError(f"缺少 {env_var}")
 
-    provider_cls = PROVIDERS[options.source]
+    provider_cls = PROVIDERS[source]
     return provider_cls(
         api_key,
         source_timezone=options.source_timezone,
@@ -64,6 +65,25 @@ def collect_events(options: RuntimeOptions, *, since: date, until: date) -> list
         "开始拉取数据：source=%s symbols=%s 窗口=%s~%s", options.source, ",".join(options.symbols), since, until
     )
     events = provider.fetch(options.symbols, since, until)
+    collected_symbols = {event.symbol for event in events}
+    missing = [symbol for symbol in options.symbols if symbol not in collected_symbols]
+
+    if missing and options.fallback_source:
+        logger.info(
+            "主数据源 %s 缺少 %d 个符号，尝试后备数据源 %s：%s",
+            options.source,
+            len(missing),
+            options.fallback_source,
+            ",".join(missing),
+        )
+        fallback_provider = _resolve_provider(options, source_override=options.fallback_source)
+        fallback_events = fallback_provider.fetch(missing, since, until)
+        events.extend(fallback_events)
+        collected_symbols.update(event.symbol for event in fallback_events)
+        missing = [symbol for symbol in options.symbols if symbol not in collected_symbols]
+
+    if missing:
+        logger.warning("仍缺少 %d 个符号的财报日期：%s", len(missing), ",".join(missing))
     if options.market_events:
         extras = generate_market_events(since, until, options)
         if extras:

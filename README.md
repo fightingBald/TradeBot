@@ -56,12 +56,14 @@ earnings-calendar \
   --google-insert \
   --market-events \
   --macro-events \
+  --fallback-source=finnhub \
   --log-level=INFO
 
 # 仅导出 ICS
 earnings-calendar --symbols=AAPL,MSFT --days=60 --export-ics=earnings.ics
 ```
 小贴士：命令行参数 > TOML > `.env` > 默认值。只改想改的那几项就行。
+如果主数据源漏掉个别符号，可加 `--fallback-source=finnhub`（或在配置里设置 `fallback_source`）用后备源补齐。
 
 ## ARK 持仓自动化
 1. `.env` 填好邮箱 SMTP（`EMAIL_HOST/PORT/USERNAME/PASSWORD` 等），收件人写在 `config/notification_recipients.toml`。

@@ -43,6 +43,7 @@ earnings-calendar \
   --google-insert \
   --market-events \
   --macro-events \
+  --fallback-source=finnhub \
   --log-level=INFO
 ```
 
@@ -55,11 +56,20 @@ earnings-calendar \
 - `--market-events` / `--macro-events`：附加衍生品结算日、Benzinga 宏观日历；`--macro-event-keywords` 可作白名单。
 - `--incremental` + `--sync-state-path`：做增量同步，避免重复写 Google。
 - `--icloud-insert` + `--icloud-*`：写 iCloud CalDAV。
+- `--fallback-source`：当主数据源漏掉某些符号时，用后备数据源（fmp/finnhub）补齐。
 - `--source-tz` / `--target-tz` / `--event-duration` / `--session-times`：各种时间设置。
 - `--env-file`：默认找项目根目录 `.env`，也可以指定其它路径。
 - `--config`：TOML/JSON 配置；默认是 `config/events_to_google_calendar.toml`，文件不存在会自动生成模板。
 
 优先级：命令行 > TOML > `.env` > 默认值。只覆盖你关心的字段就好。
+
+## 定位缺失数据的小工具
+如果怀疑某个符号被数据源漏掉，可以单独用调试脚本：
+```bash
+python py_scripts/calendar/debug_fetch.py --symbols=AVGO,ORCL --source=fmp --days=60 --env-file=.env
+# 或切到 Finnhub
+python py_scripts/calendar/debug_fetch.py --symbols=AVGO,ORCL --source=finnhub --days=60 --env-file=.env
+```
 
 ## `.env` 与配置文件
 - `.env` 存 API Key、Google 凭据位置、是否默认写入 Google 等开关。

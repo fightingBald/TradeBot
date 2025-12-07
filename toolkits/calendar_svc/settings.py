@@ -53,6 +53,8 @@ market_events = false
 macro_events = false
 macro_event_source = "benzinga"
 macro_event_keywords = ["FOMC", "ECB", "BOE", "BOJ", "CPI", "PPI", "NFP", "Retail Sales", "ISM", "Treasury"]
+# 当主数据源缺失符号时，可设置后备数据源 (fmp/finnhub)
+# fallback_source = "finnhub"
 
 # 增量同步（仅对 Google Calendar 生效）
 incremental_sync = false
@@ -83,6 +85,7 @@ _ENV_KEY_MACRO_KEYWORDS = "MACRO_EVENT_KEYWORDS"
 _ENV_KEY_MACRO_SOURCE = "MACRO_EVENT_SOURCE"
 _ENV_KEY_INCREMENTAL_SYNC = "INCREMENTAL_SYNC"
 _ENV_KEY_SYNC_STATE_PATH = "SYNC_STATE_PATH"
+_ENV_KEY_FALLBACK_SOURCE = "FALLBACK_SOURCE"
 
 
 @dataclass
@@ -110,6 +113,7 @@ class RuntimeOptions:
     macro_event_source: str = "benzinga"
     incremental_sync: bool = False
     sync_state_path: str | None = None
+    fallback_source: str | None = None
 
 
 def parse_symbols(raw: Iterable[str]) -> list[str]:
@@ -430,6 +434,22 @@ def _resolve_macro_source(ctx: _ResolverContext) -> str:
     return macro_event_source
 
 
+def _resolve_fallback_source(ctx: _ResolverContext, primary_source: str) -> str | None:
+    raw = (
+        getattr(ctx.parsed, "fallback_source", None)
+        or ctx.config.get("fallback_source")
+        or os.getenv(_ENV_KEY_FALLBACK_SOURCE)
+    )
+    if raw in (None, ""):
+        return None
+    value = str(raw).strip().lower()
+    if value not in {"fmp", "finnhub"}:
+        raise ValueError("fallback_source 目前仅支持 fmp 或 finnhub")
+    if value == primary_source:
+        raise ValueError("fallback_source 不可与主数据源相同")
+    return value
+
+
 def build_runtime_options(
     parsed: argparse.Namespace, config: Mapping[str, Any], *, config_base: Path | None, project_root: Path
 ) -> RuntimeOptions:
@@ -476,6 +496,7 @@ def build_runtime_options(
     )
     macro_event_keywords = _resolve_macro_keywords(ctx)
     macro_event_source = _resolve_macro_source(ctx)
+    fallback_source = _resolve_fallback_source(ctx, source)
 
     incremental_sync = _resolve_flag(
         ctx, "incremental", config_key="incremental_sync", env_key=_ENV_KEY_INCREMENTAL_SYNC, default=False
@@ -514,6 +535,7 @@ def build_runtime_options(
         macro_event_source=macro_event_source,
         incremental_sync=incremental_sync,
         sync_state_path=str(sync_state_path) if sync_state_path is not None else None,
+        fallback_source=fallback_source,
     )
 
     return options

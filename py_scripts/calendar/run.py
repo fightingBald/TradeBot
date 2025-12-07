@@ -43,6 +43,9 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--macro-event-source", choices=["benzinga"], help="Macro economic data provider (only Benzinga is supported)."
     )
+    parser.add_argument(
+        "--fallback-source", choices=["fmp", "finnhub"], help="Optional secondary data source when primary misses symbols"
+    )
     parser.add_argument("--incremental", action="store_true", help="Enable incremental Google Calendar sync")
     parser.add_argument("--sync-state-path", help="Path to incremental sync state JSON cache")
     parser.add_argument("--icloud-insert", action="store_true", help="Insert to iCloud via CalDAV")

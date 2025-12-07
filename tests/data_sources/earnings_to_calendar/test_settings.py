@@ -89,6 +89,7 @@ def _clear_env(monkeypatch):
         "MACRO_EVENT_SOURCE",
         "INCREMENTAL_SYNC",
         "SYNC_STATE_PATH",
+        "FALLBACK_SOURCE",
     ]:
         monkeypatch.delenv(key, raising=False)
 
@@ -389,6 +390,76 @@ def test_build_runtime_options_rejects_non_benzinga(tmp_path, monkeypatch):
         macro_event_source=None,
         incremental=False,
         sync_state_path=None,
+    )
+
+    with pytest.raises(ValueError):
+        build_runtime_options(parsed, config, config_base=None, project_root=Path(tmp_path))
+
+
+def test_build_runtime_options_handles_fallback_source(tmp_path, monkeypatch):
+    _clear_env(monkeypatch)
+    monkeypatch.setenv("FALLBACK_SOURCE", "finnhub")
+    parsed = SimpleNamespace(
+        symbols="AAPL,ORCL",
+        source="fmp",
+        days=None,
+        export_ics=None,
+        google_insert=False,
+        google_credentials=None,
+        google_token=None,
+        google_calendar_id=None,
+        google_calendar_name=None,
+        google_create_calendar=False,
+        source_tz=None,
+        target_tz=None,
+        event_duration=None,
+        session_times=None,
+        market_events=False,
+        icloud_insert=False,
+        icloud_id=None,
+        icloud_app_pass=None,
+        macro_events=False,
+        macro_event_keywords=None,
+        macro_event_source=None,
+        incremental=False,
+        sync_state_path=None,
+        fallback_source=None,
+    )
+
+    options = build_runtime_options(parsed, {}, config_base=None, project_root=Path(tmp_path))
+
+    assert options.fallback_source == "finnhub"
+    assert options.source == "fmp"
+
+
+def test_build_runtime_options_rejects_same_fallback(tmp_path, monkeypatch):
+    _clear_env(monkeypatch)
+    config = {"symbols": ["AAPL"], "source": "fmp", "fallback_source": "fmp"}
+    parsed = SimpleNamespace(
+        symbols=None,
+        source=None,
+        days=None,
+        export_ics=None,
+        google_insert=False,
+        google_credentials=None,
+        google_token=None,
+        google_calendar_id=None,
+        google_calendar_name=None,
+        google_create_calendar=False,
+        source_tz=None,
+        target_tz=None,
+        event_duration=None,
+        session_times=None,
+        market_events=False,
+        icloud_insert=False,
+        icloud_id=None,
+        icloud_app_pass=None,
+        macro_events=False,
+        macro_event_keywords=None,
+        macro_event_source=None,
+        incremental=False,
+        sync_state_path=None,
+        fallback_source=None,
     )
 
     with pytest.raises(ValueError):

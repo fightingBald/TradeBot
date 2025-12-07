@@ -121,6 +121,10 @@ print("成功写入日历：", calendar_id)
 - 如果 token 过期/被撤销导致 `invalid_grant`，`_get_google_service` 会删除旧 token、自动创建父目录并重新走授权，跑完即可生成新 token。
 - 手工修复也可以：删掉 token 文件后再跑一次带 `--google-insert` 的命令完成重新授权。
 
+### 数据源缺失的兜底（fallback）
+- 主数据源（默认 FMP）漏掉某些符号时，可以指定后备数据源：CLI 加 `--fallback-source=finnhub` 或配置里写 `fallback_source = "finnhub"`（需要提供对应的 API Key）。
+- pipeline 会先用主数据源拉取；对缺失的符号再用后备数据源补齐，并在日志里提示仍缺失的列表。
+
 ## 运行前需要的环境
 - `FMP_API_KEY` / `FINNHUB_API_KEY` / `BENZINGA_API_KEY`：按需提供。
 - `GOOGLE_*`：写 Google 时要指定 credentials/token/calendar。
