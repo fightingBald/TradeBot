@@ -161,5 +161,4 @@ earnings-calendar --symbols=AAPL,MSFT --days=60 --export-ics=earnings.ics
 
 - 任务调度、重试逻辑
 
-Kubernetes 运行框架（符合你平时 MDB Marketplace 的风格）
-有其它点子就直接在 README 最后增删，保持这份文档信息最新。***
+
