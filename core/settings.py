@@ -8,16 +8,16 @@ class Settings(BaseSettings):
     """Application settings sourced from environment variables."""
 
     api_key: str = Field(
-        validation_alias=AliasChoices("alpaca_api_key", "ALPACA_API_KEY", "apca_api_key_id", "APCA_API_KEY_ID")
+        validation_alias=AliasChoices("alpaca_api_key", "ALPACA_API_KEY", "apca_api_key_id", "ALPACA_API_KEY_ID")
     )
     api_secret: str = Field(
         validation_alias=AliasChoices(
-            "alpaca_api_secret", "ALPACA_API_SECRET", "apca_api_secret_key", "APCA_API_SECRET_KEY"
+            "alpaca_api_secret", "ALPACA_API_SECRET", "apca_api_secret_key", "ALPACA_API_SECRET_KEY"
         )
     )
     data_feed: str = Field(
         default="iex",
-        validation_alias=AliasChoices("alpaca_data_feed", "ALPACA_DATA_FEED", "apca_data_feed", "APCA_DATA_FEED"),
+        validation_alias=AliasChoices("alpaca_data_feed", "ALPACA_DATA_FEED", "apca_data_feed", "ALPACA_DATA_FEED"),
     )
     base_url: str = Field(
         default="https://data.alpaca.markets/v2",
@@ -25,9 +25,9 @@ class Settings(BaseSettings):
             "alpaca_base_url",
             "ALPACA_BASE_URL",
             "apca_api_base_url",
-            "APCA_API_BASE_URL",
+            "ALPACA_API_BASE_URL",
             "apca_api_data_url",
-            "APCA_API_DATA_URL",
+            "ALPACA_API_DATA_URL",
         ),
     )
     trading_base_url: str = Field(
@@ -36,13 +36,13 @@ class Settings(BaseSettings):
             "alpaca_trading_base_url",
             "ALPACA_TRADING_BASE_URL",
             "apca_api_trading_url",
-            "APCA_API_TRADING_URL",
+            "ALPACA_API_TRADING_URL",
         ),
     )
     paper_trading: bool = Field(
         default=True,
         validation_alias=AliasChoices(
-            "alpaca_paper_trading", "ALPACA_PAPER_TRADING", "apca_paper_trading", "APCA_PAPER_TRADING"
+            "alpaca_paper_trading", "ALPACA_PAPER_TRADING", "apca_paper_trading", "ALPACA_PAPER_TRADING"
         ),
     )
 

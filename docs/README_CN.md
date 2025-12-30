@@ -97,10 +97,11 @@ streamlit run apps/ui/main.py
 ## Docker Compose（paper/live）
 准备环境文件：
 ```bash
+cp deploy/env/common.env.example deploy/env/common.env
 cp deploy/env/paper.env.example deploy/env/paper.env
 cp deploy/env/live.env.example deploy/env/live.env
 ```
-填好 API Key 后运行：
+先在 `deploy/env/common.env` 填通用配置，再在 profile 文件里写覆盖项，然后运行：
 ```bash
 docker compose -f deploy/docker-compose.yml --profile paper run --rm migrate-paper
 docker compose -f deploy/docker-compose.yml --profile paper up -d

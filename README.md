@@ -89,10 +89,11 @@ streamlit run apps/ui/main.py
 ## Docker Compose (paper/live)
 Create env files:
 ```bash
+cp deploy/env/common.env.example deploy/env/common.env
 cp deploy/env/paper.env.example deploy/env/paper.env
 cp deploy/env/live.env.example deploy/env/live.env
 ```
-Fill in API keys and any overrides, then run the profile you need:
+Fill in shared keys in `deploy/env/common.env` plus profile overrides, then run the profile you need:
 ```bash
 docker compose -f deploy/docker-compose.yml --profile paper run --rm migrate-paper
 docker compose -f deploy/docker-compose.yml --profile paper up -d

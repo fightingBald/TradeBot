@@ -253,8 +253,8 @@ profile:
   name: "paper_default"
   mode: "paper"            # paper|live
   broker: "alpaca"
-  api_key_id: "${APCA_API_KEY_ID}"
-  api_secret: "${APCA_API_SECRET_KEY}"
+  api_key_id: "${ALPACA_API_KEY_ID}"
+  api_secret: "${ALPACA_API_SECRET_KEY}"
 
 alpaca:
   trading_base_url: "https://paper-api.alpaca.markets"
