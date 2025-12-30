@@ -1,4 +1,4 @@
-# AlpacaTrading
+# Trade Bot Centaur Mode
 
 Local-first trading system focused on execution safety, state integrity, and human-in-the-loop control. The current scope targets Alpaca (paper/live) with a minimal desktop setup and a clear path to future expansion.
 
