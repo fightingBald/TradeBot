@@ -111,7 +111,7 @@ def run() -> None:
     pipeline_main()
     logger.info("Pipeline completed: summary=%s", summary_json_path)
 
-    # 清理旧的基线目录，避免在下一次运行时混淆
+    # 清理旧的基线目录, 避免在下一次运行时混淆
     baseline_root = Path("baseline")
     if baseline_root.exists():
         shutil.rmtree(baseline_root, ignore_errors=True)
@@ -126,7 +126,7 @@ def _resolve_baseline_path(baseline_dir_name: str, baseline_artifact: str) -> Pa
         return primary
     if fallback.exists():
         return fallback
-    # 如果都不存在，返回 primary 路径（管道内部会处理“首次运行”场景）
+    # 如果都不存在, 返回 primary 路径 (管道内部会处理"首次运行"场景)
     return primary
 
 

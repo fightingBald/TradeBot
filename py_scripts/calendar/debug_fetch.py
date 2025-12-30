@@ -9,7 +9,7 @@ from __future__ import annotations
 import argparse
 import logging
 import os
-from datetime import date, timedelta
+from datetime import UTC, datetime, timedelta
 
 from toolkits.calendar_svc.defaults import (
     DEFAULT_EVENT_DURATION_MINUTES,
@@ -71,7 +71,7 @@ def main() -> None:
         raise SystemExit("Please provide at least one symbol.")
 
     provider = _build_provider(args.source)
-    today = date.today()
+    today = datetime.now(UTC).date()
     until = today + timedelta(days=args.days)
     logger.info("Fetching %s symbols=%s window=%s~%s", args.source, ",".join(symbols), today, until)
     events = provider.fetch(symbols, today, until)

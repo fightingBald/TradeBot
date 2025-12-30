@@ -52,7 +52,7 @@ def _parse_time_value(value: Any) -> dt_time | None:
     formats = ["%H:%M:%S", "%H:%M", "%I:%M %p"]
     for fmt in formats:
         try:
-            return datetime.strptime(text, fmt).time()
+            return datetime.strptime(text, fmt).time()  # noqa: DTZ007
         except ValueError:
             continue
     return None

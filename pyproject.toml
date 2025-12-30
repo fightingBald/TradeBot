@@ -7,7 +7,7 @@ name = "alpaca-trading"
 version = "0.1.0"
 description = "Quant research playground with Alpaca utilities, earnings calendar, and automation scripts."
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.13"
 authors = [{ name = "Huayi Tang" }]
 dynamic = ["dependencies"]
 
@@ -17,6 +17,7 @@ earnings-calendar = "py_scripts.calendar.run:main"
 [tool.ruff]
 target-version = "py313"
 line-length = 120
+exclude = ["api/gen", "storage/migrations"]
 
 [tool.ruff.lint]
 # 开启 Ruff 作为 linter（默认开启）
@@ -27,6 +28,8 @@ select = [
     "I",             # import 排序（替代 isort）
     "B",             # bugbear（潜在 bug）
     "PL",            # pylint 子集（有用但不过度）
+    "S",             # 安全检查（bandit）
+    "DTZ",           # timezone-aware datetime
     "RUF",           # ruff 自有规则
 ]
 # 关键：全局忽略（放过）
@@ -40,8 +43,10 @@ ignore = [
 ]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/**/*" = ["PLR", "S101"]  # 例：测试里允许一些命名/print
+"tests/**/*" = ["PLR", "S101", "S105", "S106"]  # 例：测试里允许一些命名/print
 "**/__init__.py" = ["F401"]     # 允许包内导出未使用
+"toolkits/ark/holdings/diff.py" = ["S101"]
+"toolkits/calendar_svc/settings.py" = ["S105"]
 
 [tool.ruff.format]
 quote-style = "double"

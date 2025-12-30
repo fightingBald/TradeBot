@@ -60,7 +60,7 @@ class EarningsDataProvider:
         formats = ["%H:%M", "%H:%M:%S", "%I:%M %p", "%I %p"]
         for fmt in formats:
             try:
-                return datetime.strptime(text, fmt).time()
+                return datetime.strptime(text, fmt).time()  # noqa: DTZ007
             except ValueError:
                 continue
         return None

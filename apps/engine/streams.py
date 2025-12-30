@@ -43,6 +43,6 @@ def run_trading_stream(
         except Exception:
             logger.exception("Trading WS stopped unexpectedly (reconnecting in %ss)", backoff_seconds)
 
-        jitter = random.uniform(0, 0.5)
+        jitter = random.uniform(0, 0.5)  # noqa: S311
         time.sleep(backoff_seconds + jitter)
         backoff_seconds = min(backoff_seconds * 2, max_backoff)

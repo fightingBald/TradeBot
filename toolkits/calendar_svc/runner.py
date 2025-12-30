@@ -6,7 +6,7 @@ import os
 import sys
 from collections.abc import Sequence
 from dataclasses import dataclass
-from datetime import date, datetime, time, timedelta
+from datetime import UTC, date, datetime, time, timedelta
 from zoneinfo import ZoneInfo
 
 from .calendars import GoogleCalendarConfig, build_ics, google_insert, icloud_caldav_insert
@@ -233,7 +233,7 @@ def apply_outputs(
 
 
 def run(options: RuntimeOptions, *, today: date | None = None) -> RunSummary:
-    start_date = today or date.today()
+    start_date = today or datetime.now(UTC).date()
     end_date = start_date + timedelta(days=options.days)
     events = collect_events(options, since=start_date, until=end_date)
     sync_diff: SyncDiff | None = None
