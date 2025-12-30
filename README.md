@@ -20,7 +20,7 @@ Shared domain and interfaces live in `core/`, with concrete implementations in `
 - Streamlit + Altair for a read-only desktop UI.
 - SQLite + SQLAlchemy + Alembic for local state; Postgres in Docker Compose.
 - Redis for command queueing between FastAPI and Engine.
-- Pydantic settings for configuration via `.env`.
+- Pydantic settings for configuration via environment variables.
 
 ## Current Scope (Local Desktop MVP)
 - Alpaca integration only (paper/live).
@@ -48,9 +48,7 @@ uv pip install -e .
 ```
 
 ## Configuration
-Use environment variables or a `.env` file. See `.env.example` for a complete list.
-
-Minimal set:
+Use environment variables. Minimal set:
 ```
 ALPACA_API_KEY=xxx
 ALPACA_API_SECRET=xxx
@@ -93,7 +91,8 @@ cp deploy/env/common.env.example deploy/env/common.env
 cp deploy/env/paper.env.example deploy/env/paper.env
 cp deploy/env/live.env.example deploy/env/live.env
 ```
-Fill in shared keys in `deploy/env/common.env` plus profile overrides, then run the profile you need:
+Fill in shared keys in `deploy/env/common.env` plus profile overrides, then run the profile you need.
+Docker builds ignore `deploy/env/*.env` to keep secrets out of images.
 ```bash
 docker compose -f deploy/docker-compose.yml --profile paper run --rm migrate-paper
 docker compose -f deploy/docker-compose.yml --profile paper up -d

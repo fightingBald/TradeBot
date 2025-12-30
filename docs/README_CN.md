@@ -25,16 +25,16 @@
 - Streamlit + Altair：只读桌面 GUI。
 - SQLite + SQLAlchemy + Alembic：本地状态存储与迁移；Docker 可选 Postgres。
 - Redis：FastAPI 与 Engine 之间的命令队列。
-- Pydantic settings：统一环境变量与 `.env` 配置。
+- Pydantic settings：统一环境变量配置。
 
 ## 环境/账号要求
 - Python 3.10 以上（本地推荐装成 `.venv`）。
 - uv（Python 包管理器）。
-- Alpaca 账号和一对 API Key（写入 `.env` 或环境变量）。
+- Alpaca 账号和一对 API Key（写入环境变量）。
 - Redis（本地或容器）。
 - SQLite（默认本地文件）。
 - Docker + Docker Compose（可选）。
-- 可选：FMP/Finnhub/Benzinga/Google/iCloud 等三方 Key，按需放进 `.env`。
+- 可选：FMP/Finnhub/Benzinga/Google/iCloud 等三方 Key，按需放进环境变量。
 
 ## 快速开工（建议逐条敲）
 ```bash
@@ -44,7 +44,7 @@ source .venv/bin/activate  # Windows 用 .venv\Scripts\activate
 uv pip install -e .
 ```
 
-`.env` 示范（缺啥补啥）：
+环境变量示范（缺啥补啥）：
 ```
 ALPACA_API_KEY=xxx
 ALPACA_API_SECRET=xxx
@@ -102,6 +102,7 @@ cp deploy/env/paper.env.example deploy/env/paper.env
 cp deploy/env/live.env.example deploy/env/live.env
 ```
 先在 `deploy/env/common.env` 填通用配置，再在 profile 文件里写覆盖项，然后运行：
+Docker 构建会忽略 `deploy/env/*.env`，避免密钥进入镜像。
 ```bash
 docker compose -f deploy/docker-compose.yml --profile paper run --rm migrate-paper
 docker compose -f deploy/docker-compose.yml --profile paper up -d
@@ -123,13 +124,13 @@ docker compose -f deploy/docker-compose.yml --profile live up -d
 ## Earnings Calendar CLI（财报/宏观日历）
 - 命令：`earnings-calendar`（安装 `uv pip install -e .` 后自动带上），也可以 `python -m py_scripts.calendar.run`。
 - 默认配置文件：`config/events_to_google_calendar.toml`。如果没有，脚本会自动生成模板。
-- `.env` 里至少要放 FMP/Finnhub Key；要写入 Google，就再放 `GOOGLE_*`；要抓宏观就放 `BENZINGA_API_KEY`。
+- 至少要放 FMP/Finnhub Key；要写入 Google，就再放 `GOOGLE_*`；要抓宏观就放 `BENZINGA_API_KEY`。
 
 常用例子：
 ```bash
 earnings-calendar \
   --config=config/events_to_google_calendar.toml \
-  --env-file=.env \
+  --env-file=deploy/env/common.env \
   --google-insert \
   --market-events \
   --macro-events \
@@ -139,11 +140,11 @@ earnings-calendar \
 # 仅导出 ICS
 earnings-calendar --symbols=AAPL,MSFT --days=60 --export-ics=earnings.ics
 ```
-小贴士：命令行参数 > TOML > `.env` > 默认值。只改想改的那几项就行。
+小贴士：命令行参数 > TOML > env 文件 > 默认值。只改想改的那几项就行。
 如果主数据源漏掉个别符号，可加 `--fallback-source=finnhub`（或在配置里设置 `fallback_source`）用后备源补齐。
 
 ## ARK 持仓自动化
-1. `.env` 填好邮箱 SMTP（`EMAIL_HOST/PORT/USERNAME/PASSWORD` 等），收件人写在 `config/notification_recipients.toml`。
+1. 设置邮箱 SMTP 环境变量（`EMAIL_HOST/PORT/USERNAME/PASSWORD` 等），收件人写在 `config/notification_recipients.toml`。
 2. 想比对每天的变动，直接跑：
    ```bash
    python py_scripts/ark_holdings/daily_pipeline.py \
