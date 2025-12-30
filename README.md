@@ -18,6 +18,7 @@ Shared domain and interfaces live in `core/`, with concrete implementations in `
 
 ## Requirements
 - Python 3.10+
+- uv (Python package manager)
 - Alpaca account and API keys
 - Redis (local or container)
 - SQLite (local file)
@@ -27,9 +28,9 @@ Optional keys (only if you use the related scripts): FMP/Finnhub/Benzinga/Google
 ## Install
 ```bash
 cd /path/to/AlpacaTrading
-python -m venv .venv
+uv venv .venv
 source .venv/bin/activate  # Windows: .venv\Scripts\activate
-pip install -e .
+uv pip install -e .
 ```
 
 ## Configuration

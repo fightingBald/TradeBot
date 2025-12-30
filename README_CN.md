@@ -21,6 +21,7 @@
 
 ## 环境/账号要求
 - Python 3.10 以上（本地推荐装成 `.venv`）。
+- uv（Python 包管理器）。
 - Alpaca 账号和一对 API Key（写入 `.env` 或环境变量）。
 - Redis（本地或容器）。
 - SQLite（默认本地文件）。
@@ -29,9 +30,9 @@
 ## 快速开工（建议逐条敲）
 ```bash
 cd /path/to/AlpacaTrading
-python -m venv .venv
+uv venv .venv
 source .venv/bin/activate  # Windows 用 .venv\Scripts\activate
-pip install -e .
+uv pip install -e .
 ```
 
 `.env` 示范（缺啥补啥）：
@@ -160,5 +161,4 @@ earnings-calendar --symbols=AAPL,MSFT --days=60 --export-ics=earnings.ics
 - 日志系统
 
 - 任务调度、重试逻辑
-
 
