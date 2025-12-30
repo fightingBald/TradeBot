@@ -159,9 +159,12 @@ class Settings(BaseSettings):
             logger.warning(
                 "ALPACA_PAPER_TRADING=false but trading_base_url looks paper: %s", self.trading_base_url
             )
-        if "alpaca.markets" in self.base_url and not _looks_like_data_url(self.base_url):
-            if _looks_like_trading_url(self.base_url):
-                logger.warning("ALPACA_BASE_URL looks like trading endpoint: %s", self.base_url)
+        if (
+            "alpaca.markets" in self.base_url
+            and not _looks_like_data_url(self.base_url)
+            and _looks_like_trading_url(self.base_url)
+        ):
+            logger.warning("ALPACA_BASE_URL looks like trading endpoint: %s", self.base_url)
 
         _warn_unknown_prefixed_env("ALPACA_", _KNOWN_ALPACA_ENV_KEYS)
         _warn_unknown_prefixed_env("ENGINE_", _KNOWN_ENGINE_ENV_KEYS)

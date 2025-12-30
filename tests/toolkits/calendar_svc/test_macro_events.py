@@ -17,31 +17,31 @@ class _Response:
 
 
 def _base_options(**overrides):
-    params = dict(
-        symbols=["AAPL"],
-        source="fmp",
-        days=30,
-        export_ics=None,
-        google_insert=False,
-        google_credentials="cred.json",
-        google_token="token.json",
-        google_calendar_id=None,
-        google_calendar_name=None,
-        google_create_calendar=False,
-        source_timezone="America/New_York",
-        target_timezone="America/New_York",
-        event_duration_minutes=60,
-        session_time_map={"AMC": "17:00"},
-        market_events=False,
-        icloud_insert=False,
-        icloud_id=None,
-        icloud_app_pass=None,
-        macro_events=True,
-        macro_event_keywords=[],
-        macro_event_source="benzinga",
-        incremental_sync=False,
-        sync_state_path=None,
-    )
+    params = {
+        "symbols": ["AAPL"],
+        "source": "fmp",
+        "days": 30,
+        "export_ics": None,
+        "google_insert": False,
+        "google_credentials": "cred.json",
+        "google_token": "token.json",
+        "google_calendar_id": None,
+        "google_calendar_name": None,
+        "google_create_calendar": False,
+        "source_timezone": "America/New_York",
+        "target_timezone": "America/New_York",
+        "event_duration_minutes": 60,
+        "session_time_map": {"AMC": "17:00"},
+        "market_events": False,
+        "icloud_insert": False,
+        "icloud_id": None,
+        "icloud_app_pass": None,
+        "macro_events": True,
+        "macro_event_keywords": [],
+        "macro_event_source": "benzinga",
+        "incremental_sync": False,
+        "sync_state_path": None,
+    }
     params.update(overrides)
     return RuntimeOptions(**params)
 

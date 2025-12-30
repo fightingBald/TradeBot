@@ -64,7 +64,7 @@ def fetch_holdings_snapshot(etf: str, *, timeout: int = 30) -> HoldingSnapshot:
 def fetch_all_snapshots(*, timeout: int = 30) -> dict[str, HoldingSnapshot]:
     """Fetch snapshots for all supported ETFs."""
     snapshots: dict[str, HoldingSnapshot] = {}
-    for etf in FUND_CSV.keys():
+    for etf in FUND_CSV:
         try:
             snapshots[etf] = fetch_holdings_snapshot(etf, timeout=timeout)
         except Exception as exc:  # pragma: no cover - network issues

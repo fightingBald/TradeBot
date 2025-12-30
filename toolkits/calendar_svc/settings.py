@@ -544,7 +544,7 @@ def build_runtime_options(
     macro_events, macro_event_keywords, macro_event_source, fallback_source = _resolve_macro_options(ctx, source)
     incremental_sync, sync_state_path = _resolve_sync_state(ctx, config_base=config_base, project_root=project_root)
 
-    options = RuntimeOptions(
+    return RuntimeOptions(
         symbols=symbols,
         source=source,
         days=days,
@@ -570,8 +570,6 @@ def build_runtime_options(
         sync_state_path=sync_state_path,
         fallback_source=fallback_source,
     )
-
-    return options
 
 
 __all__ = ["RuntimeOptions", "build_runtime_options", "load_config", "load_env_file", "parse_symbols"]

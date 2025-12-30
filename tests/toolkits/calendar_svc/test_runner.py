@@ -96,30 +96,30 @@ def test_run_incremental_skips_when_state_matches(tmp_path, monkeypatch):
 
     sync_path = tmp_path / "sync-state.json"
 
-    base_options = dict(
-        symbols=["AAPL"],
-        source="fmp",
-        days=30,
-        export_ics=None,
-        google_insert=True,
-        google_credentials="cred.json",
-        google_token="token.json",
-        google_calendar_id=None,
-        google_calendar_name="Company Earnings",
-        google_create_calendar=True,
-        source_timezone="America/New_York",
-        target_timezone="America/New_York",
-        event_duration_minutes=60,
-        session_time_map={"AMC": "17:00"},
-        market_events=False,
-        icloud_insert=False,
-        icloud_id=None,
-        icloud_app_pass=None,
-        macro_events=False,
-        macro_event_keywords=[],
-        incremental_sync=True,
-        sync_state_path=str(sync_path),
-    )
+    base_options = {
+        "symbols": ["AAPL"],
+        "source": "fmp",
+        "days": 30,
+        "export_ics": None,
+        "google_insert": True,
+        "google_credentials": "cred.json",
+        "google_token": "token.json",
+        "google_calendar_id": None,
+        "google_calendar_name": "Company Earnings",
+        "google_create_calendar": True,
+        "source_timezone": "America/New_York",
+        "target_timezone": "America/New_York",
+        "event_duration_minutes": 60,
+        "session_time_map": {"AMC": "17:00"},
+        "market_events": False,
+        "icloud_insert": False,
+        "icloud_id": None,
+        "icloud_app_pass": None,
+        "macro_events": False,
+        "macro_event_keywords": [],
+        "incremental_sync": True,
+        "sync_state_path": str(sync_path),
+    }
 
     options = RuntimeOptions(**base_options)
 

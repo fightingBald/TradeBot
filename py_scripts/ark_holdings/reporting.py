@@ -51,7 +51,7 @@ def _build_etf_report(
 ) -> dict[str, object]:
     filtered_changes = [change for change in changes if _is_meaningful_change(change)]
     buys, sells = _split_changes(filtered_changes)
-    report = {
+    return {
         "etf": symbol,
         "current_as_of": current.as_of.isoformat(),
         "baseline_as_of": baseline.as_of.isoformat() if baseline else None,
@@ -62,7 +62,6 @@ def _build_etf_report(
         "new_positions": [change_to_dict(change) for change in filtered_changes if change.action == "new"],
         "exited_positions": [change_to_dict(change) for change in filtered_changes if change.action == "exit"],
     }
-    return report
 
 
 def _split_changes(changes: Sequence[HoldingChange]) -> tuple[list[HoldingChange], list[HoldingChange]]:

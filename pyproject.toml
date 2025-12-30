@@ -30,6 +30,10 @@ select = [
     "PL",            # pylint 子集（有用但不过度）
     "S",             # 安全检查（bandit）
     "DTZ",           # timezone-aware datetime
+    "C90",           # 圈复杂度（mccabe）
+    "SIM",           # 简化表达（flake8-simplify）
+    "RET",           # return 结构优化（flake8-return）
+    "C4",            # comprehensions（flake8-comprehensions）
     "RUF",           # ruff 自有规则
 ]
 # 关键：全局忽略（放过）
@@ -41,6 +45,9 @@ ignore = [
     # 如果连导入未排序也想放过，再加上：
     # "I001",
 ]
+
+[tool.ruff.lint.mccabe]
+max-complexity = 10
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**/*" = ["PLR", "S101", "S105", "S106"]  # 例：测试里允许一些命名/print
