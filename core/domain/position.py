@@ -6,8 +6,8 @@ from typing import Any
 from pydantic import AliasChoices, BaseModel, ConfigDict, Field, field_validator
 
 
-class UserPosition(BaseModel):
-    """Domain model representing an Alpaca trading position for a user."""
+class Position(BaseModel):
+    """Domain model representing a trading position."""
 
     symbol: str
     asset_id: str
@@ -34,7 +34,7 @@ class UserPosition(BaseModel):
         return str(value)
 
     @classmethod
-    def from_alpaca(cls, position: Any) -> UserPosition:
+    def from_alpaca(cls, position: Any) -> Position:
         """Factory that maps an Alpaca SDK Position object or dict into the domain model."""
         if hasattr(position, "model_dump"):
             raw: dict[str, Any] = position.model_dump()

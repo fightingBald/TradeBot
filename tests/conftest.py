@@ -3,6 +3,7 @@ from __future__ import annotations
 import importlib
 import sys
 import types
+import warnings
 from enum import Enum
 from pathlib import Path
 
@@ -16,7 +17,9 @@ def _install_alpaca_stub() -> None:
     """Provide a minimal alpaca SDK shim for environments without alpaca-py."""
 
     try:
-        importlib.import_module("alpaca.trading.enums")
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", DeprecationWarning)
+            importlib.import_module("alpaca.trading.enums")
         return
     except ModuleNotFoundError:
         pass

@@ -3,8 +3,8 @@ from typing import Any
 
 import pytest
 
-from app.config import Settings
-from app.services.alpaca_market_data import AlpacaMarketDataService
+from adapters.brokers.alpaca_service import AlpacaBrokerService
+from core.settings import Settings
 
 
 def _position_payload(symbol: str, quantity_key: str = "qty") -> dict[str, Any]:
@@ -58,16 +58,16 @@ def test_get_user_positions_converts_sdk_models(monkeypatch) -> None:
         def model_dump(self) -> dict[str, Any]:
             return self._payload
 
-    monkeypatch.setattr("app.services.alpaca_market_data.TradingClient", fake_trading_client)
+    monkeypatch.setattr("adapters.brokers.alpaca_service.TradingClient", fake_trading_client)
     monkeypatch.setenv("ALPACA_API_KEY", "key")
     monkeypatch.setenv("ALPACA_API_SECRET", "secret")
     monkeypatch.setenv("ALPACA_TRADING_BASE_URL", "https://paper-api.alpaca.markets")
     monkeypatch.setenv("ALPACA_PAPER_TRADING", "true")
 
     settings = Settings()
-    service = AlpacaMarketDataService(settings)
+    service = AlpacaBrokerService(settings)
 
-    positions = service.get_user_positions()
+    positions = service.get_positions()
 
     assert len(positions) == 2
     assert positions[0].symbol == "AAPL"
@@ -92,16 +92,16 @@ def test_get_user_positions_wraps_api_errors(monkeypatch) -> None:
         def get_all_positions(self) -> list[Any]:
             raise DummyAPIError("boom")
 
-    monkeypatch.setattr("app.services.alpaca_market_data.TradingClient", DummyTradingClient)
-    monkeypatch.setattr("app.services.alpaca_market_data.APIError", DummyAPIError)
+    monkeypatch.setattr("adapters.brokers.alpaca_service.TradingClient", DummyTradingClient)
+    monkeypatch.setattr("adapters.brokers.alpaca_service.APIError", DummyAPIError)
     monkeypatch.setenv("ALPACA_API_KEY", "key")
     monkeypatch.setenv("ALPACA_API_SECRET", "secret")
 
     settings = Settings()
-    service = AlpacaMarketDataService(settings)
+    service = AlpacaBrokerService(settings)
 
     with pytest.raises(RuntimeError) as excinfo:
-        service.get_user_positions()
+        service.get_positions()
 
     assert "Failed to fetch positions" in str(excinfo.value)
 
@@ -120,13 +120,13 @@ def test_cancel_open_orders_wraps_api_errors(monkeypatch) -> None:
         def get_all_positions(self) -> list[Any]:
             return []
 
-    monkeypatch.setattr("app.services.alpaca_market_data.TradingClient", DummyTradingClient)
-    monkeypatch.setattr("app.services.alpaca_market_data.APIError", DummyAPIError)
+    monkeypatch.setattr("adapters.brokers.alpaca_service.TradingClient", DummyTradingClient)
+    monkeypatch.setattr("adapters.brokers.alpaca_service.APIError", DummyAPIError)
     monkeypatch.setenv("ALPACA_API_KEY", "key")
     monkeypatch.setenv("ALPACA_API_SECRET", "secret")
 
     settings = Settings()
-    service = AlpacaMarketDataService(settings)
+    service = AlpacaBrokerService(settings)
 
     with pytest.raises(RuntimeError) as excinfo:
         service.cancel_open_orders()
@@ -149,12 +149,12 @@ def test_close_all_positions_passes_cancel_orders(monkeypatch) -> None:
         def get_all_positions(self) -> list[Any]:
             return []
 
-    monkeypatch.setattr("app.services.alpaca_market_data.TradingClient", DummyTradingClient)
+    monkeypatch.setattr("adapters.brokers.alpaca_service.TradingClient", DummyTradingClient)
     monkeypatch.setenv("ALPACA_API_KEY", "key")
     monkeypatch.setenv("ALPACA_API_SECRET", "secret")
 
     settings = Settings()
-    service = AlpacaMarketDataService(settings)
+    service = AlpacaBrokerService(settings)
 
     service.close_all_positions(cancel_orders=False)
 
@@ -175,13 +175,13 @@ def test_close_all_positions_wraps_api_errors(monkeypatch) -> None:
         def get_all_positions(self) -> list[Any]:
             return []
 
-    monkeypatch.setattr("app.services.alpaca_market_data.TradingClient", DummyTradingClient)
-    monkeypatch.setattr("app.services.alpaca_market_data.APIError", DummyAPIError)
+    monkeypatch.setattr("adapters.brokers.alpaca_service.TradingClient", DummyTradingClient)
+    monkeypatch.setattr("adapters.brokers.alpaca_service.APIError", DummyAPIError)
     monkeypatch.setenv("ALPACA_API_KEY", "key")
     monkeypatch.setenv("ALPACA_API_SECRET", "secret")
 
     settings = Settings()
-    service = AlpacaMarketDataService(settings)
+    service = AlpacaBrokerService(settings)
 
     with pytest.raises(RuntimeError) as excinfo:
         service.close_all_positions()

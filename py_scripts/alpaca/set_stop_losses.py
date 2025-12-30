@@ -11,8 +11,8 @@ from alpaca.trading.client import TradingClient  # type: ignore  # noqa: E402
 from alpaca.trading.enums import OrderSide, OrderType, QueryOrderStatus, TimeInForce  # type: ignore  # noqa: E402
 from alpaca.trading.requests import GetOrdersRequest, StopOrderRequest  # type: ignore  # noqa: E402
 
-from app.config import get_settings  # noqa: E402
-from app.models import UserPosition  # noqa: E402
+from core.domain.position import Position  # noqa: E402
+from core.settings import get_settings  # noqa: E402
 
 STOP_ORDER_PREFIX = "STOPBOT-"
 
@@ -38,7 +38,7 @@ def compute_stop_price(current_price: Decimal, stop_pct: Decimal) -> Decimal:
     return stop_price.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
 
 
-def _is_long_position(position: UserPosition) -> bool:
+def _is_long_position(position: Position) -> bool:
     return position.side.lower() == "long"
 
 
@@ -60,7 +60,7 @@ def apply_stop_losses(
     trading_client: TradingClient, *, stop_pct: Decimal, tolerance_pct: Decimal, dry_run: bool = False
 ) -> None:
     positions_raw = trading_client.get_all_positions()
-    positions = [UserPosition.from_alpaca(pos) for pos in positions_raw]
+    positions = [Position.from_alpaca(pos) for pos in positions_raw]
     symbols = [pos.symbol for pos in positions]
     managed_orders = _collect_managed_stop_orders(trading_client, symbols)
 

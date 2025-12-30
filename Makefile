@@ -9,16 +9,16 @@ install:
 	$(PYTHON) -m pip install -e .
 
 build:
-	$(PYTHON) -m compileall app toolkits py_scripts
+	$(PYTHON) -m compileall apps core adapters toolkits py_scripts
 
 test:
 	$(ACTIVATE) && pytest
 
 format:
-	$(ACTIVATE) && ruff check --fix app toolkits py_scripts tests && ruff format app toolkits py_scripts tests
+	$(ACTIVATE) && ruff check --fix apps core adapters toolkits py_scripts tests && ruff format apps core adapters toolkits py_scripts tests
 
 lint:
-	$(ACTIVATE) && ruff check app toolkits py_scripts tests
+	$(ACTIVATE) && ruff check apps core adapters toolkits py_scripts tests
 
 clean:
 	rm -rf build dist .pytest_cache .mypy_cache htmlcov coverage .ruff_cache

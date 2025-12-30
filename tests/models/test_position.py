@@ -2,7 +2,7 @@ from decimal import Decimal
 
 import pytest
 
-from app.models.user_position import UserPosition
+from core.domain.position import Position
 
 
 def _position_payload(symbol: str = "AAPL", qty: str = "5") -> dict:
@@ -36,7 +36,7 @@ def test_from_alpaca_accepts_sdk_objects() -> None:
     payload = _position_payload()
     sdk_position = DummySDKPosition(payload)
 
-    result = UserPosition.from_alpaca(sdk_position)
+    result = Position.from_alpaca(sdk_position)
 
     assert result.symbol == "AAPL"
     assert result.quantity == Decimal("5")
@@ -46,7 +46,7 @@ def test_from_alpaca_accepts_sdk_objects() -> None:
 def test_from_alpaca_accepts_plain_dicts() -> None:
     payload = _position_payload(symbol="MSFT")
 
-    result = UserPosition.from_alpaca(payload)
+    result = Position.from_alpaca(payload)
 
     assert result.symbol == "MSFT"
     assert result.quantity == Decimal("5")
@@ -54,4 +54,4 @@ def test_from_alpaca_accepts_plain_dicts() -> None:
 
 def test_from_alpaca_rejects_unknown_objects() -> None:
     with pytest.raises(TypeError):
-        UserPosition.from_alpaca(object())
+        Position.from_alpaca(object())

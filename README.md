@@ -1,7 +1,9 @@
 # AlpacaTrading 项目说明
 
 ## 这套东西是干嘛的？
-* 一套本地可跑的 FastAPI 服务，实时去 Alpaca 拉行情，顺手画热力图页面。
+* Engine 独立进程：订阅 WS + 管状态 + 风控自动卖出。
+* FastAPI：读状态给 UI + 接收命令 + 编排（draft/confirm/kill switch）。
+* Streamlit：只看 + 点按钮，不直接打券商。
 * 一堆脚本（`py_scripts/`）帮忙管仓位：批量设置止损、同步财报/宏观日历、抓 ARK ETF 持仓、发邮件。
 * 共享的业务逻辑放在 `toolkits/`，方便 CLI、服务、notebook 复用。
 * 先做风控和执行，别先做“预测未来”
@@ -20,6 +22,8 @@
 ## 环境/账号要求
 - Python 3.10 以上（本地推荐装成 `.venv`）。
 - Alpaca 账号和一对 API Key（写入 `.env` 或环境变量）。
+- Redis（本地或容器）。
+- SQLite（默认本地文件）。
 - 可选：FMP/Finnhub/Benzinga/Google/iCloud 等三方 Key，按需放进 `.env`。
 
 ## 快速开工（建议逐条敲）
@@ -37,6 +41,10 @@ ALPACA_API_SECRET=xxx
 ALPACA_DATA_FEED=iex
 ALPACA_TRADING_BASE_URL=https://paper-api.alpaca.markets
 ALPACA_PAPER_TRADING=true
+DATABASE_URL=sqlite:///./data/engine.db
+REDIS_URL=redis://localhost:6379/0
+ENGINE_POLL_INTERVAL_SECONDS=10
+ENGINE_ENABLE_TRADING_WS=true
 FMP_API_KEY=xxx
 FINNHUB_API_KEY=xxx
 BENZINGA_API_KEY=xxx
@@ -47,20 +55,37 @@ GOOGLE_TOKEN_PATH=secrets/token.json
 ## 跑 FastAPI 服务
 ```bash
 source .venv/bin/activate
-uvicorn app.main:app --reload
+uvicorn apps.api.main:app --reload
 ```
 跑起来后：
 - `GET /health`：心跳。
-- `GET /quotes`：实时报价，可加 `?symbols=AAPL&symbols=MSFT`。
-- `GET /positions`：读取账户持仓（需要交易端权限）。
-- `GET /`：五秒刷一次的热力图 Dashboard。
+- `GET /state/profile`：当前 profile 与环境。
+- `GET /state/positions`：读取持仓快照（来自 Engine + SQLite）。
+- `POST /commands/*`：下发命令（draft/confirm/kill-switch）。
+
+## 跑 Engine
+```bash
+source .venv/bin/activate
+python -m apps.engine.main
+```
+说明：Engine 负责 WS + 轮询同步持仓并落库，命令通过 Redis 队列下发。
+
+## 数据库迁移
+```bash
+alembic upgrade head
+```
 
 ## 跑 Streamlit GUI（持仓分布 + 一键清仓）
 ```bash
 source .venv/bin/activate
-streamlit run app/streamlit_app.py
+streamlit run apps/ui/main.py
 ```
-提示：live 环境需要二次确认口令；执行 Kill Switch 会撤单并平掉全部持仓。
+提示：live 环境需要二次确认口令；执行 Kill Switch 会进入命令队列。
+
+## Market data strategy (current)
+- Engine 使用 Alpaca trading websocket 监听回报。
+- 持仓快照仍以轮询同步（可逐步替换为更实时的回报驱动）。
+- UI 只通过 FastAPI 拉取状态。
 
 ## Earnings Calendar CLI（财报/宏观日历）
 - 命令：`earnings-calendar`（安装 `pip install -e .` 后自动带上），也可以 `python -m py_scripts.calendar.run`。
@@ -105,7 +130,10 @@ earnings-calendar --symbols=AAPL,MSFT --days=60 --export-ics=earnings.ics
 改动完建议起码跑 `build` / `lint` / `test` 各一次。
 
 ## 目录结构速览
-- `app/`：FastAPI（配置、模型、服务、模板）+ Streamlit GUI。
+- `apps/`：入口层（api/engine/ui）。
+- `core/`：领域模型与 ports 接口。
+- `adapters/`：外部系统适配器（券商/存储/消息）。
+- `storage/`：数据库迁移与结构化存储。
 - `toolkits/`：通用业务模块（日历、ARK、通知等）。
 - `py_scripts/`：命令行脚本入口。
 - `config/`：TOML 配置（事件日历、邮件收件人）。

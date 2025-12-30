@@ -51,7 +51,7 @@ line-ending = "lf"
 docstring-code-format = true
 
 [tool.ruff.lint.isort]
-known-first-party = ["app", "toolkits", "py_scripts", "tests"]
+known-first-party = ["apps", "core", "adapters", "toolkits", "py_scripts", "tests"]
 combine-as-imports = true
 split-on-trailing-comma = false
 
@@ -59,7 +59,7 @@ split-on-trailing-comma = false
 zip-safe = false
 
 [tool.setuptools.packages.find]
-include = ["app*", "toolkits*", "py_scripts*", "tests*"]
+include = ["apps*", "core*", "adapters*", "toolkits*", "py_scripts*", "tests*"]
 
 [tool.setuptools.dynamic]
 dependencies = { file = ["requirements.txt"] }

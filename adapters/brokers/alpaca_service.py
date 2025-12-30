@@ -8,14 +8,14 @@ from alpaca.data import StockHistoricalDataClient
 from alpaca.data.requests import StockLatestQuoteRequest
 from alpaca.trading.client import TradingClient
 
-from app.config import Settings
-from app.models import UserPosition
+from core.domain.position import Position
+from core.settings import Settings
 
 logger = logging.getLogger(__name__)
 
 
-class AlpacaMarketDataService:
-    """Light wrapper around Alpaca's market data REST client."""
+class AlpacaBrokerService:
+    """Wrapper around Alpaca's trading + market data REST clients."""
 
     def __init__(self, settings: Settings) -> None:
         client_kwargs = {"api_key": settings.api_key, "secret_key": settings.api_secret}
@@ -66,14 +66,14 @@ class AlpacaMarketDataService:
             }
         return quotes
 
-    def get_user_positions(self) -> list[UserPosition]:
+    def get_positions(self) -> list[Position]:
         """Fetch the currently open positions for the authenticated Alpaca account."""
         try:
             positions = self._trading_client.get_all_positions()
         except APIError as exc:
             raise RuntimeError(f"Failed to fetch positions from Alpaca: {exc}") from exc
 
-        return [UserPosition.from_alpaca(position) for position in positions]
+        return [Position.from_alpaca(position) for position in positions]
 
     def cancel_open_orders(self) -> list[Any] | dict[str, Any]:
         """Cancel all open orders for the authenticated Alpaca account."""
