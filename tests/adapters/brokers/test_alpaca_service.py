@@ -187,3 +187,108 @@ def test_close_all_positions_wraps_api_errors(monkeypatch) -> None:
         service.close_all_positions()
 
     assert "Failed to close positions" in str(excinfo.value)
+
+
+def test_get_latest_quotes_returns_empty_for_no_symbols(monkeypatch) -> None:
+    class DummyTradingClient:
+        def __init__(self, **_: Any) -> None:
+            pass
+
+        def get_all_positions(self) -> list[Any]:
+            return []
+
+    monkeypatch.setattr("adapters.brokers.alpaca_service.TradingClient", DummyTradingClient)
+    monkeypatch.setenv("ALPACA_API_KEY", "key")
+    monkeypatch.setenv("ALPACA_API_SECRET", "secret")
+
+    settings = Settings()
+    service = AlpacaBrokerService(settings)
+
+    assert service.get_latest_quotes([]) == {}
+
+
+def test_get_latest_quotes_builds_request(monkeypatch) -> None:
+    created_requests: list[Any] = []
+    created_clients: list[Any] = []
+
+    class DummyQuote:
+        def __init__(self, symbol: str) -> None:
+            self.ask_price = 101.0
+            self.ask_size = 1
+            self.bid_price = 100.0
+            self.bid_size = 2
+            self.timestamp = None
+            self.exchange = "XNAS"
+
+    class DummyDataClient:
+        def __init__(self, api_key: str, secret_key: str, base_url: str | None = None) -> None:
+            self.api_key = api_key
+            self.secret_key = secret_key
+            self.base_url = base_url
+            created_clients.append(self)
+
+        def get_stock_latest_quote(self, request: Any) -> dict[str, DummyQuote]:
+            created_requests.append(request)
+            return {"AAPL": DummyQuote("AAPL"), "MSFT": DummyQuote("MSFT")}
+
+    class DummyRequest:
+        def __init__(self, **kwargs: Any) -> None:
+            self.kwargs = kwargs
+
+    class DummyTradingClient:
+        def __init__(self, **_: Any) -> None:
+            pass
+
+        def get_all_positions(self) -> list[Any]:
+            return []
+
+    monkeypatch.setattr("adapters.brokers.alpaca_service.StockHistoricalDataClient", DummyDataClient)
+    monkeypatch.setattr("adapters.brokers.alpaca_service.StockLatestQuoteRequest", DummyRequest)
+    monkeypatch.setattr("adapters.brokers.alpaca_service.TradingClient", DummyTradingClient)
+    monkeypatch.setenv("ALPACA_API_KEY", "key")
+    monkeypatch.setenv("ALPACA_API_SECRET", "secret")
+    monkeypatch.setenv("ALPACA_DATA_FEED", "iex")
+    monkeypatch.setenv("ALPACA_BASE_URL", "https://data.alpaca.markets")
+
+    settings = Settings()
+    service = AlpacaBrokerService(settings)
+
+    quotes = service.get_latest_quotes(["aapl", "msft", "aapl"])
+
+    assert set(quotes.keys()) == {"AAPL", "MSFT"}
+    assert created_clients[0].base_url == settings.base_url
+    assert created_requests[0].kwargs["feed"] == settings.data_feed
+    assert set(created_requests[0].kwargs["symbol_or_symbols"]) == {"AAPL", "MSFT"}
+
+
+def test_get_latest_quotes_wraps_api_errors(monkeypatch) -> None:
+    class DummyAPIError(Exception):
+        pass
+
+    class DummyDataClient:
+        def __init__(self, **_: Any) -> None:
+            pass
+
+        def get_stock_latest_quote(self, _request: Any) -> dict[str, Any]:
+            raise DummyAPIError("boom")
+
+    class DummyTradingClient:
+        def __init__(self, **_: Any) -> None:
+            pass
+
+        def get_all_positions(self) -> list[Any]:
+            return []
+
+    monkeypatch.setattr("adapters.brokers.alpaca_service.StockHistoricalDataClient", DummyDataClient)
+    monkeypatch.setattr("adapters.brokers.alpaca_service.TradingClient", DummyTradingClient)
+    monkeypatch.setattr("adapters.brokers.alpaca_service.APIError", DummyAPIError)
+    monkeypatch.setenv("ALPACA_API_KEY", "key")
+    monkeypatch.setenv("ALPACA_API_SECRET", "secret")
+
+    settings = Settings()
+    service = AlpacaBrokerService(settings)
+
+    with pytest.raises(RuntimeError) as excinfo:
+        service.get_latest_quotes(["AAPL"])
+
+    assert "Failed to fetch quotes" in str(excinfo.value)

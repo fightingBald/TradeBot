@@ -1,4 +1,4 @@
-.PHONY: install build test format lint clean fetch-ark diff-ark
+.PHONY: install build test coverage format lint clean fetch-ark diff-ark
 
 PYTHON ?= python
 VENV ?= .venv
@@ -13,6 +13,9 @@ build:
 
 test:
 	$(ACTIVATE) && pytest
+
+coverage:
+	$(ACTIVATE) && pytest --cov --cov-report=term-missing
 
 format:
 	$(ACTIVATE) && ruff check --fix apps core adapters toolkits py_scripts tests && ruff format apps core adapters toolkits py_scripts tests

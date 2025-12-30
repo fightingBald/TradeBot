@@ -9,6 +9,14 @@ Local-first trading system focused on execution safety, state integrity, and hum
 
 Shared domain and interfaces live in `core/`, with concrete implementations in `adapters/`.
 
+## Technology Choices
+- Alpaca-py for trading REST and `trade_updates` WebSocket.
+- FastAPI as the control plane (state queries + command orchestration).
+- Streamlit + Altair for a read-only desktop UI.
+- SQLite + SQLAlchemy + Alembic for local state (portable and migration-friendly).
+- Redis for command queueing between FastAPI and Engine.
+- Pydantic settings for configuration via `.env`.
+
 ## Current Scope (Local Desktop MVP)
 - Alpaca integration only (paper/live).
 - Position distribution and PnL visualization in the GUI.
@@ -46,7 +54,9 @@ ALPACA_DATA_FEED=iex
 DATABASE_URL=sqlite:///./data/engine.db
 REDIS_URL=redis://localhost:6379/0
 ENGINE_POLL_INTERVAL_SECONDS=10
+ENGINE_SYNC_MIN_INTERVAL_SECONDS=3
 ENGINE_ENABLE_TRADING_WS=true
+ENGINE_TRADING_WS_MAX_BACKOFF_SECONDS=30
 ```
 
 ## Run (Local)
@@ -78,10 +88,12 @@ streamlit run apps/ui/main.py
 - `POST /commands/confirm` confirm staged command
 - `POST /commands/kill-switch` emergency liquidation request
 
-## Market Data Strategy (Current)
-- Trading WebSocket for execution updates.
-- Position snapshots still synced by polling (can be replaced with event-driven updates).
-- UI uses FastAPI only.
+## Execution & State Strategy (Current)
+- Engine owns the single trading WebSocket connection (free-plan friendly).
+- `trade_updates` triggers an immediate position refresh; periodic polling remains as reconciliation.
+- Position sync is throttled by `ENGINE_SYNC_MIN_INTERVAL_SECONDS` to respect rate limits.
+- WebSocket reconnect uses exponential backoff with jitter (`ENGINE_TRADING_WS_MAX_BACKOFF_SECONDS`).
+- UI uses FastAPI only and never talks directly to the broker.
 
 ## Optional CLI Tools
 - Earnings calendar: `earnings-calendar` (see `config/events_to_google_calendar.toml`).
@@ -92,7 +104,9 @@ streamlit run apps/ui/main.py
 make build
 make lint
 make test
+make coverage
 ```
+Coverage threshold: 80% on runtime modules (`apps/api`, `apps/engine`, `core`, `adapters`, `toolkits`).
 
 ## Directory Layout
 - `apps/` entrypoints (api/engine/ui)

@@ -63,6 +63,14 @@ class Settings(BaseSettings):
         default=10,
         validation_alias=AliasChoices("engine_poll_interval_seconds", "ENGINE_POLL_INTERVAL_SECONDS", "engine_poll_interval"),
     )
+    engine_sync_min_interval_seconds: int = Field(
+        default=3,
+        validation_alias=AliasChoices(
+            "engine_sync_min_interval_seconds",
+            "ENGINE_SYNC_MIN_INTERVAL_SECONDS",
+            "engine_sync_min_interval",
+        ),
+    )
     engine_profile_id: str = Field(
         default="default",
         validation_alias=AliasChoices("engine_profile_id", "ENGINE_PROFILE_ID", "profile_id"),
@@ -70,6 +78,14 @@ class Settings(BaseSettings):
     engine_enable_trading_ws: bool = Field(
         default=True,
         validation_alias=AliasChoices("engine_enable_trading_ws", "ENGINE_ENABLE_TRADING_WS", "engine_trading_ws"),
+    )
+    engine_trading_ws_max_backoff_seconds: int = Field(
+        default=30,
+        validation_alias=AliasChoices(
+            "engine_trading_ws_max_backoff_seconds",
+            "ENGINE_TRADING_WS_MAX_BACKOFF_SECONDS",
+            "engine_trading_ws_backoff_max",
+        ),
     )
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", env_prefix="", extra="ignore")

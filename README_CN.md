@@ -19,6 +19,14 @@
 - 外部数据源与外部 DB 暂不接入，但保留接口以便后续扩展。
 - 结构化日志记录关键动作与环境信息。
 
+## 技术选型
+- Alpaca-py：交易 REST + `trade_updates` WebSocket。
+- FastAPI：控制面（状态查询 + 命令编排）。
+- Streamlit + Altair：只读桌面 GUI。
+- SQLite + SQLAlchemy + Alembic：本地状态存储与迁移。
+- Redis：FastAPI 与 Engine 之间的命令队列。
+- Pydantic settings：统一环境变量与 `.env` 配置。
+
 ## 环境/账号要求
 - Python 3.10 以上（本地推荐装成 `.venv`）。
 - uv（Python 包管理器）。
@@ -45,7 +53,9 @@ ALPACA_PAPER_TRADING=true
 DATABASE_URL=sqlite:///./data/engine.db
 REDIS_URL=redis://localhost:6379/0
 ENGINE_POLL_INTERVAL_SECONDS=10
+ENGINE_SYNC_MIN_INTERVAL_SECONDS=3
 ENGINE_ENABLE_TRADING_WS=true
+ENGINE_TRADING_WS_MAX_BACKOFF_SECONDS=30
 FMP_API_KEY=xxx
 FINNHUB_API_KEY=xxx
 BENZINGA_API_KEY=xxx
@@ -83,10 +93,12 @@ streamlit run apps/ui/main.py
 ```
 提示：live 环境需要二次确认口令；执行 Kill Switch 会进入命令队列。
 
-## Market data strategy (current)
-- Engine 使用 Alpaca trading websocket 监听回报。
-- 持仓快照仍以轮询同步（可逐步替换为更实时的回报驱动）。
-- UI 只通过 FastAPI 拉取状态。
+## 执行与状态策略（Current）
+- Engine 独占交易 WS（符合免费版单连接限制）。
+- `trade_updates` 触发即时持仓刷新，轮询保留做最终对账。
+- `ENGINE_SYNC_MIN_INTERVAL_SECONDS` 限制刷新频率，避免打满速率限制。
+- WS 断线后指数退避重连（`ENGINE_TRADING_WS_MAX_BACKOFF_SECONDS`）。
+- UI 只走 FastAPI，不直连券商。
 
 ## Earnings Calendar CLI（财报/宏观日历）
 - 命令：`earnings-calendar`（安装 `pip install -e .` 后自动带上），也可以 `python -m py_scripts.calendar.run`。
@@ -128,7 +140,9 @@ earnings-calendar --symbols=AAPL,MSFT --days=60 --export-ics=earnings.ics
 - `make lint`：`ruff` 静态检查。
 - `make format`：`ruff` 自动修风格。
 - `make test`：`pytest` 单测 + 轻量集成测试。
+- `make coverage`：覆盖率统计（阈值 80%）。
 改动完建议起码跑 `build` / `lint` / `test` 各一次。
+说明：覆盖率门槛只统计运行时核心模块（`apps/api`、`apps/engine`、`core`、`adapters`、`toolkits`）。
 
 ## 目录结构速览
 - `apps/`：入口层（api/engine/ui）。
@@ -161,4 +175,3 @@ earnings-calendar --symbols=AAPL,MSFT --days=60 --export-ics=earnings.ics
 - 日志系统
 
 - 任务调度、重试逻辑
-

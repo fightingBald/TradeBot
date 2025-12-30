@@ -64,3 +64,6 @@ jobs:
 
       - name: Run test target
         run: make test
+
+      - name: Run coverage gate
+        run: make coverage

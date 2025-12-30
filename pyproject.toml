@@ -68,3 +68,13 @@ dependencies = { file = ["requirements.txt"] }
 addopts = "-q"
 testpaths = ["tests"]
 filterwarnings = ["error::DeprecationWarning"]
+
+[tool.coverage.run]
+branch = true
+source = ["apps.api", "apps.engine", "core", "adapters", "toolkits"]
+omit = ["tests/*", "*/tests/*", ".venv/*"]
+
+[tool.coverage.report]
+show_missing = true
+skip_empty = true
+fail_under = 80
