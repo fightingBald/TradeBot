@@ -9,11 +9,16 @@ Local-first trading system focused on execution safety, state integrity, and hum
 
 Shared domain and interfaces live in `core/`, with concrete implementations in `adapters/`.
 
+## Docs
+- Internal notes: `docs/README_CN.md`
+- Roadmap: `docs/roadmap.md`
+- External API references: `docs/external_api/alpaca_doc.md`
+
 ## Technology Choices
 - Alpaca-py for trading REST and `trade_updates` WebSocket.
 - FastAPI as the control plane (state queries + command orchestration).
 - Streamlit + Altair for a read-only desktop UI.
-- SQLite + SQLAlchemy + Alembic for local state (portable and migration-friendly).
+- SQLite + SQLAlchemy + Alembic for local state; Postgres in Docker Compose.
 - Redis for command queueing between FastAPI and Engine.
 - Pydantic settings for configuration via `.env`.
 
@@ -21,7 +26,7 @@ Shared domain and interfaces live in `core/`, with concrete implementations in `
 - Alpaca integration only (paper/live).
 - Position distribution and PnL visualization in the GUI.
 - Kill switch with a confirmation step for live trading.
-- No external data sources or external DB yet, but interfaces are reserved.
+- No external data sources yet; local default is SQLite while Docker uses Postgres.
 - Structured logs for key actions and environment context.
 
 ## Requirements
@@ -30,6 +35,7 @@ Shared domain and interfaces live in `core/`, with concrete implementations in `
 - Alpaca account and API keys
 - Redis (local or container)
 - SQLite (local file)
+- Docker + Docker Compose (optional)
 
 Optional keys (only if you use the related scripts): FMP/Finnhub/Benzinga/Google/iCloud.
 
@@ -80,6 +86,26 @@ Streamlit UI:
 streamlit run apps/ui/main.py
 ```
 
+## Docker Compose (paper/live)
+Create env files:
+```bash
+cp deploy/env/paper.env.example deploy/env/paper.env
+cp deploy/env/live.env.example deploy/env/live.env
+```
+Fill in API keys and any overrides, then run the profile you need:
+```bash
+docker compose -f deploy/docker-compose.yml --profile paper run --rm migrate-paper
+docker compose -f deploy/docker-compose.yml --profile paper up -d
+```
+Live profile (separate containers and ports):
+```bash
+docker compose -f deploy/docker-compose.yml --profile live run --rm migrate-live
+docker compose -f deploy/docker-compose.yml --profile live up -d
+```
+Ports: paper API `:8000`, paper UI `:8501`; live API `:8001`, live UI `:8502`.
+
+Note: UI talks to FastAPI only; Engine owns the broker/WebSocket connection.
+
 ## API Endpoints
 - `GET /health` health check
 - `GET /state/profile` active profile and environment
@@ -115,10 +141,12 @@ Coverage threshold: 80% on runtime modules (`apps/api`, `apps/engine`, `core`, `
 - `storage/` database migrations and schema
 - `toolkits/` shared business logic
 - `py_scripts/` CLI scripts
-- `config/` TOML configuration
+- `config/` TOML configuration (includes `config/ci/` for CI variables)
+- `deploy/` Docker artifacts (Compose, Dockerfile, env examples)
+- `docs/` internal docs and references
 - `tests/` pytest tests
 - `scripts/` CI and automation
 - `secrets/` local credentials (only `.gitkeep` is committed)
 
 ## Roadmap
-See `roadmap.md` for long-term planning and milestones.
+See `docs/roadmap.md` for long-term planning and milestones.

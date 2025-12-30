@@ -16,14 +16,14 @@
 - 仅接入 Alpaca（paper/live），先把持仓读取与展示做稳。
 - 本地 GUI 展示持仓分布与盈亏。
 - GUI 一键清仓（Kill Switch）+ live 二次确认。
-- 外部数据源与外部 DB 暂不接入，但保留接口以便后续扩展。
+- 外部数据源暂不接入；本地默认 SQLite，Docker 可选 Postgres。
 - 结构化日志记录关键动作与环境信息。
 
 ## 技术选型
 - Alpaca-py：交易 REST + `trade_updates` WebSocket。
 - FastAPI：控制面（状态查询 + 命令编排）。
 - Streamlit + Altair：只读桌面 GUI。
-- SQLite + SQLAlchemy + Alembic：本地状态存储与迁移。
+- SQLite + SQLAlchemy + Alembic：本地状态存储与迁移；Docker 可选 Postgres。
 - Redis：FastAPI 与 Engine 之间的命令队列。
 - Pydantic settings：统一环境变量与 `.env` 配置。
 
@@ -33,6 +33,7 @@
 - Alpaca 账号和一对 API Key（写入 `.env` 或环境变量）。
 - Redis（本地或容器）。
 - SQLite（默认本地文件）。
+- Docker + Docker Compose（可选）。
 - 可选：FMP/Finnhub/Benzinga/Google/iCloud 等三方 Key，按需放进 `.env`。
 
 ## 快速开工（建议逐条敲）
@@ -93,6 +94,24 @@ streamlit run apps/ui/main.py
 ```
 提示：live 环境需要二次确认口令；执行 Kill Switch 会进入命令队列。
 
+## Docker Compose（paper/live）
+准备环境文件：
+```bash
+cp deploy/env/paper.env.example deploy/env/paper.env
+cp deploy/env/live.env.example deploy/env/live.env
+```
+填好 API Key 后运行：
+```bash
+docker compose -f deploy/docker-compose.yml --profile paper run --rm migrate-paper
+docker compose -f deploy/docker-compose.yml --profile paper up -d
+```
+Live 模式：
+```bash
+docker compose -f deploy/docker-compose.yml --profile live run --rm migrate-live
+docker compose -f deploy/docker-compose.yml --profile live up -d
+```
+端口：paper API `:8000`、paper UI `:8501`；live API `:8001`、live UI `:8502`。
+
 ## 执行与状态策略（Current）
 - Engine 独占交易 WS（符合免费版单连接限制）。
 - `trade_updates` 触发即时持仓刷新，轮询保留做最终对账。
@@ -101,7 +120,7 @@ streamlit run apps/ui/main.py
 - UI 只走 FastAPI，不直连券商。
 
 ## Earnings Calendar CLI（财报/宏观日历）
-- 命令：`earnings-calendar`（安装 `pip install -e .` 后自动带上），也可以 `python -m py_scripts.calendar.run`。
+- 命令：`earnings-calendar`（安装 `uv pip install -e .` 后自动带上），也可以 `python -m py_scripts.calendar.run`。
 - 默认配置文件：`config/events_to_google_calendar.toml`。如果没有，脚本会自动生成模板。
 - `.env` 里至少要放 FMP/Finnhub Key；要写入 Google，就再放 `GOOGLE_*`；要抓宏观就放 `BENZINGA_API_KEY`。
 
@@ -152,6 +171,9 @@ earnings-calendar --symbols=AAPL,MSFT --days=60 --export-ics=earnings.ics
 - `toolkits/`：通用业务模块（日历、ARK、通知等）。
 - `py_scripts/`：命令行脚本入口。
 - `config/`：TOML 配置（事件日历、邮件收件人）。
+- `config/ci/`：CI 变量配置。
+- `deploy/`：Docker 工件（Compose、Dockerfile、env 示例）。
+- `docs/`：内部文档与参考资料。
 - `tests/`：pytest 测试。
 - `scripts/`：CI/批处理脚本。
 - `secrets/`：放本地凭据（仓库里只有 `.gitkeep`，别提交真实钥匙）。

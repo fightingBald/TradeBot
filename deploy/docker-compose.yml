@@ -1,0 +1,172 @@
+x-app-base: &app-base
+  build:
+    context: ..
+    dockerfile: deploy/Dockerfile
+  restart: unless-stopped
+  environment:
+    PYTHONUNBUFFERED: "1"
+    PYTHONPATH: "/app"
+  networks:
+    - trading-net
+
+x-postgres-env: &postgres-env
+  POSTGRES_USER: alpaca
+  POSTGRES_PASSWORD: alpaca
+
+x-postgres-base: &postgres-base
+  image: postgres:16-alpine
+  restart: unless-stopped
+  environment:
+    <<: *postgres-env
+  healthcheck:
+    test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+    interval: 5s
+    timeout: 5s
+    retries: 5
+  networks:
+    - trading-net
+
+x-redis-base: &redis-base
+  image: redis:7-alpine
+  restart: unless-stopped
+  command: ["redis-server", "--save", "", "--appendonly", "no"]
+  healthcheck:
+    test: ["CMD", "redis-cli", "ping"]
+    interval: 5s
+    timeout: 3s
+    retries: 5
+  networks:
+    - trading-net
+
+services:
+  postgres-paper:
+    <<: *postgres-base
+    profiles: ["paper"]
+    environment:
+      <<: *postgres-env
+      POSTGRES_DB: alpaca_paper
+    volumes:
+      - postgres_paper_data:/var/lib/postgresql/data
+
+  redis-paper:
+    <<: *redis-base
+    profiles: ["paper"]
+
+  migrate-paper:
+    <<: *app-base
+    profiles: ["paper"]
+    env_file:
+      - ./env/paper.env
+    command: alembic upgrade head
+    restart: "no"
+    depends_on:
+      postgres-paper:
+        condition: service_healthy
+
+  api-paper:
+    <<: *app-base
+    profiles: ["paper"]
+    env_file:
+      - ./env/paper.env
+    command: uvicorn apps.api.main:app --host 0.0.0.0 --port 8000
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres-paper:
+        condition: service_healthy
+      redis-paper:
+        condition: service_healthy
+
+  engine-paper:
+    <<: *app-base
+    profiles: ["paper"]
+    env_file:
+      - ./env/paper.env
+    command: python -m apps.engine.main
+    depends_on:
+      postgres-paper:
+        condition: service_healthy
+      redis-paper:
+        condition: service_healthy
+
+  ui-paper:
+    <<: *app-base
+    profiles: ["paper"]
+    env_file:
+      - ./env/paper.env
+    command: streamlit run apps/ui/main.py --server.address=0.0.0.0 --server.port=8501
+    ports:
+      - "8501:8501"
+    depends_on:
+      api-paper:
+        condition: service_started
+
+  postgres-live:
+    <<: *postgres-base
+    profiles: ["live"]
+    environment:
+      <<: *postgres-env
+      POSTGRES_DB: alpaca_live
+    volumes:
+      - postgres_live_data:/var/lib/postgresql/data
+
+  redis-live:
+    <<: *redis-base
+    profiles: ["live"]
+
+  migrate-live:
+    <<: *app-base
+    profiles: ["live"]
+    env_file:
+      - ./env/live.env
+    command: alembic upgrade head
+    restart: "no"
+    depends_on:
+      postgres-live:
+        condition: service_healthy
+
+  api-live:
+    <<: *app-base
+    profiles: ["live"]
+    env_file:
+      - ./env/live.env
+    command: uvicorn apps.api.main:app --host 0.0.0.0 --port 8000
+    ports:
+      - "8001:8000"
+    depends_on:
+      postgres-live:
+        condition: service_healthy
+      redis-live:
+        condition: service_healthy
+
+  engine-live:
+    <<: *app-base
+    profiles: ["live"]
+    env_file:
+      - ./env/live.env
+    command: python -m apps.engine.main
+    depends_on:
+      postgres-live:
+        condition: service_healthy
+      redis-live:
+        condition: service_healthy
+
+  ui-live:
+    <<: *app-base
+    profiles: ["live"]
+    env_file:
+      - ./env/live.env
+    command: streamlit run apps/ui/main.py --server.address=0.0.0.0 --server.port=8501
+    ports:
+      - "8502:8501"
+    depends_on:
+      api-live:
+        condition: service_started
+
+volumes:
+  postgres_paper_data:
+  postgres_live_data:
+
+networks:
+  trading-net:
+    driver: bridge
