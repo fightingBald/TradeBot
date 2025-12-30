@@ -14,7 +14,7 @@ from core.domain.position import Position
 logger = logging.getLogger(__name__)
 
 
-class SqliteStateStore:
+class SqlAlchemyStateStore:
     def __init__(self, database_url: str, *, create_tables: bool = True) -> None:
         connect_args = {"check_same_thread": False} if database_url.startswith("sqlite") else {}
         self._engine: Engine = create_engine(database_url, connect_args=connect_args, future=True)

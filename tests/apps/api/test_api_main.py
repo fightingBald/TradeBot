@@ -43,7 +43,7 @@ def _build_client(
     positions: list[Position] | None = None,
 ) -> TestClient:
     DummyStateStore.positions = positions or []
-    monkeypatch.setattr(api_main, "SqliteStateStore", DummyStateStore)
+    monkeypatch.setattr(api_main, "SqlAlchemyStateStore", DummyStateStore)
     monkeypatch.setattr(api_main, "RedisCommandBus", DummyCommandBus)
     monkeypatch.setenv("ALPACA_API_KEY", "key")
     monkeypatch.setenv("ALPACA_API_SECRET", "secret")

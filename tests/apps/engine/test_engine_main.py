@@ -9,6 +9,7 @@ from types import SimpleNamespace
 import pytest
 
 import apps.engine.main as engine_main
+import apps.engine.streams as engine_streams
 from core.domain.commands import Command, CommandType
 from core.domain.position import Position
 
@@ -156,7 +157,7 @@ def test_run_engine_runs_tasks_and_cleans_up(monkeypatch: pytest.MonkeyPatch, en
 
     monkeypatch.setattr(engine_main, "Settings", DummySettings)
     monkeypatch.setattr(engine_main, "AlpacaBrokerAdapter", fake_broker)
-    monkeypatch.setattr(engine_main, "SqliteStateStore", fake_store)
+    monkeypatch.setattr(engine_main, "SqlAlchemyStateStore", fake_store)
     monkeypatch.setattr(engine_main, "RedisCommandBus", fake_bus)
     monkeypatch.setattr(engine_main, "_sync_positions_loop", fake_sync)
     monkeypatch.setattr(engine_main, "_command_loop", fake_command)
@@ -207,7 +208,7 @@ def test_run_trading_stream_sets_refresh_event(monkeypatch: pytest.MonkeyPatch) 
     def fake_sleep(_seconds: float) -> None:
         raise RuntimeError("stop")
 
-    monkeypatch.setattr(engine_main.time, "sleep", fake_sleep)
+    monkeypatch.setattr(engine_streams.time, "sleep", fake_sleep)
 
     with pytest.raises(RuntimeError, match="stop"):
         engine_main._run_trading_stream(settings, loop, refresh_event)

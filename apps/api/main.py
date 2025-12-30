@@ -8,7 +8,7 @@ from fastapi import Depends, FastAPI, HTTPException, status
 from pydantic import BaseModel, Field
 
 from adapters.messaging.redis_command_bus import RedisCommandBus
-from adapters.storage.sqlite_store import SqliteStateStore
+from adapters.storage.sqlalchemy_state_store import SqlAlchemyStateStore
 from core.domain.commands import Command, CommandType
 from core.domain.position import Position
 from core.settings import Settings
@@ -50,7 +50,7 @@ class ConfirmOrderRequest(BaseModel):
 async def lifespan(app: FastAPI):
     _configure_logging()
     settings = Settings()
-    state_store = SqliteStateStore(settings.database_url)
+    state_store = SqlAlchemyStateStore(settings.database_url)
     command_bus = RedisCommandBus(settings.redis_url, settings.command_queue_name)
 
     app.state.settings = settings
@@ -71,7 +71,7 @@ def get_settings() -> Settings:
     return app.state.settings
 
 
-def get_state_store() -> SqliteStateStore:
+def get_state_store() -> SqlAlchemyStateStore:
     return app.state.state_store
 
 
@@ -80,7 +80,7 @@ def get_command_bus() -> RedisCommandBus:
 
 
 SettingsDep = Annotated[Settings, Depends(get_settings)]
-StateStoreDep = Annotated[SqliteStateStore, Depends(get_state_store)]
+StateStoreDep = Annotated[SqlAlchemyStateStore, Depends(get_state_store)]
 CommandBusDep = Annotated[RedisCommandBus, Depends(get_command_bus)]
 
 

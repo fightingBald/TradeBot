@@ -9,7 +9,8 @@ Adapters implement the core ports and isolate external SDKs.
 
 ## Storage
 
-`adapters/storage/sqlite_store.py` persists positions snapshots to SQLite.
+`adapters/storage/sqlalchemy_state_store.py` persists positions snapshots via SQLAlchemy
+(SQLite locally, Postgres in Docker Compose).
 
 ## Messaging
 

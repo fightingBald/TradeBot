@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from decimal import Decimal
 
-from adapters.storage.sqlite_store import SqliteStateStore
+from adapters.storage.sqlalchemy_state_store import SqlAlchemyStateStore
 from core.domain.position import Position
 
 
@@ -22,7 +22,7 @@ def _position(symbol: str, market_value: str, quantity: str) -> Position:
 
 def test_upsert_and_list_positions(tmp_path) -> None:
     db_path = tmp_path / "engine.db"
-    store = SqliteStateStore(f"sqlite:///{db_path}")
+    store = SqlAlchemyStateStore(f"sqlite:///{db_path}")
 
     positions = [
         _position("AAPL", market_value="200", quantity="2"),
@@ -45,7 +45,7 @@ def test_upsert_and_list_positions(tmp_path) -> None:
 
 def test_upsert_accepts_long_symbol(tmp_path) -> None:
     db_path = tmp_path / "engine.db"
-    store = SqliteStateStore(f"sqlite:///{db_path}")
+    store = SqlAlchemyStateStore(f"sqlite:///{db_path}")
 
     long_symbol = "ORCL260618C00200000"
     store.upsert_positions("alpha", [_position(long_symbol, market_value="5020", quantity="2")])

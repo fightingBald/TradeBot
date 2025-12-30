@@ -117,6 +117,95 @@ def _format_google_event_lines(events: Sequence[EarningsEvent], options: Runtime
     return "\n".join(f"  {line}" for line in lines)
 
 
+def _build_sync_stats(sync_diff: SyncDiff, total: int) -> dict[str, int]:
+    return {
+        "created": len(sync_diff.to_create),
+        "updated": len(sync_diff.to_update),
+        "skipped": len(sync_diff.unchanged),
+        "total": total,
+    }
+
+
+def _apply_ics_output(options: RuntimeOptions, events: Sequence[EarningsEvent], summary: RunSummary) -> None:
+    if not options.export_ics:
+        return
+    logger.info("导出 ICS 文件：%s", options.export_ics)
+    ics_payload = build_ics(
+        events,
+        prodid="-//earnings-to-calendar//",
+        target_timezone=options.target_timezone,
+        default_duration_minutes=options.event_duration_minutes,
+    )
+    with open(options.export_ics, "w", encoding="utf-8") as file_obj:
+        file_obj.write(ics_payload)
+    print(f"ICS 已导出：{options.export_ics}")
+    summary.ics_path = options.export_ics
+
+
+def _apply_google_output(
+    options: RuntimeOptions,
+    *,
+    events_for_google: Sequence[EarningsEvent],
+    sync_diff: SyncDiff | None,
+    summary: RunSummary,
+    total_events: int,
+) -> None:
+    if not options.google_insert:
+        if sync_diff is not None:
+            summary.sync_stats = _build_sync_stats(sync_diff, total_events)
+        return
+
+    logger.info(
+        "写入 Google Calendar：calendarId=%s calendarName=%s create_if_missing=%s credentials=%s token=%s",
+        options.google_calendar_id,
+        options.google_calendar_name,
+        options.google_create_calendar,
+        options.google_credentials,
+        options.google_token,
+    )
+    if sync_diff is not None:
+        summary.sync_stats = _build_sync_stats(sync_diff, total_events)
+        logger.info(
+            "增量同步统计：create=%d update=%d skip=%d total=%d",
+            summary.sync_stats["created"],
+            summary.sync_stats["updated"],
+            summary.sync_stats["skipped"],
+            summary.sync_stats["total"],
+        )
+    if events_for_google:
+        formatted = _format_google_event_lines(events_for_google, options)
+        logger.info("Google Calendar 待写入事件（%d 条）：\n%s", len(events_for_google), formatted)
+        target_calendar_id = google_insert(
+            events_for_google,
+            config=GoogleCalendarConfig(
+                calendar_id=options.google_calendar_id,
+                creds_path=options.google_credentials,
+                token_path=options.google_token,
+                calendar_name=options.google_calendar_name,
+                create_if_missing=options.google_create_calendar,
+                target_timezone=options.target_timezone,
+                default_duration_minutes=options.event_duration_minutes,
+            ),
+        )
+        print(f"已写入 Google Calendar: {target_calendar_id}")
+        summary.google_calendar_id = target_calendar_id
+    else:
+        logger.info("增量同步无需写入 Google Calendar（无变动）")
+        if summary.sync_stats is None:
+            summary.sync_stats = {"created": 0, "updated": 0, "skipped": total_events, "total": total_events}
+
+
+def _apply_icloud_output(options: RuntimeOptions, events: Sequence[EarningsEvent], summary: RunSummary) -> None:
+    if not options.icloud_insert:
+        return
+    if not (options.icloud_id and options.icloud_app_pass):
+        raise RuntimeError("iCloud 需要 --icloud-id 与 --icloud-app-pass")
+    logger.info("写入 iCloud Calendar：calendar=Earnings")
+    icloud_caldav_insert(events, options.icloud_id, options.icloud_app_pass)
+    print("已写入 iCloud Calendar: Earnings")
+    summary.icloud_calendar_name = "Earnings"
+
+
 def apply_outputs(
     events: Sequence[EarningsEvent],
     options: RuntimeOptions,
@@ -130,70 +219,15 @@ def apply_outputs(
     if not events:
         print("没拉到任何财报日。检查 API Key、代码是否美股、日期范围或数据源限额。", file=sys.stderr)
 
-    if options.export_ics:
-        logger.info("导出 ICS 文件：%s", options.export_ics)
-        ics_payload = build_ics(
-            events,
-            prodid="-//earnings-to-calendar//",
-            target_timezone=options.target_timezone,
-            default_duration_minutes=options.event_duration_minutes,
-        )
-        with open(options.export_ics, "w", encoding="utf-8") as file_obj:
-            file_obj.write(ics_payload)
-        print(f"ICS 已导出：{options.export_ics}")
-        summary.ics_path = options.export_ics
-
-    if options.google_insert:
-        logger.info(
-            "写入 Google Calendar：calendarId=%s calendarName=%s create_if_missing=%s credentials=%s token=%s",
-            options.google_calendar_id,
-            options.google_calendar_name,
-            options.google_create_calendar,
-            options.google_credentials,
-            options.google_token,
-        )
-        if sync_diff is not None:
-            created = len(sync_diff.to_create)
-            updated = len(sync_diff.to_update)
-            skipped = len(sync_diff.unchanged)
-            summary.sync_stats = {"created": created, "updated": updated, "skipped": skipped, "total": len(events)}
-            logger.info("增量同步统计：create=%d update=%d skip=%d total=%d", created, updated, skipped, len(events))
-        if events_for_google:
-            formatted = _format_google_event_lines(events_for_google, options)
-            logger.info("Google Calendar 待写入事件（%d 条）：\n%s", len(events_for_google), formatted)
-            target_calendar_id = google_insert(
-                events_for_google,
-                config=GoogleCalendarConfig(
-                    calendar_id=options.google_calendar_id,
-                    creds_path=options.google_credentials,
-                    token_path=options.google_token,
-                    calendar_name=options.google_calendar_name,
-                    create_if_missing=options.google_create_calendar,
-                    target_timezone=options.target_timezone,
-                    default_duration_minutes=options.event_duration_minutes,
-                ),
-            )
-            print(f"已写入 Google Calendar: {target_calendar_id}")
-            summary.google_calendar_id = target_calendar_id
-        else:
-            logger.info("增量同步无需写入 Google Calendar（无变动）")
-            if summary.sync_stats is None:
-                summary.sync_stats = {"created": 0, "updated": 0, "skipped": len(events), "total": len(events)}
-    elif sync_diff is not None:
-        summary.sync_stats = {
-            "created": len(sync_diff.to_create),
-            "updated": len(sync_diff.to_update),
-            "skipped": len(sync_diff.unchanged),
-            "total": len(events),
-        }
-
-    if options.icloud_insert:
-        if not (options.icloud_id and options.icloud_app_pass):
-            raise RuntimeError("iCloud 需要 --icloud-id 与 --icloud-app-pass")
-        logger.info("写入 iCloud Calendar：calendar=Earnings")
-        icloud_caldav_insert(events, options.icloud_id, options.icloud_app_pass)
-        print("已写入 iCloud Calendar: Earnings")
-        summary.icloud_calendar_name = "Earnings"
+    _apply_ics_output(options, events, summary)
+    _apply_google_output(
+        options,
+        events_for_google=events_for_google,
+        sync_diff=sync_diff,
+        summary=summary,
+        total_events=len(events),
+    )
+    _apply_icloud_output(options, events, summary)
 
     return summary
 

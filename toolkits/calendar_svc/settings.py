@@ -450,32 +450,36 @@ def _resolve_fallback_source(ctx: _ResolverContext, primary_source: str) -> str 
     return value
 
 
-def build_runtime_options(
-    parsed: argparse.Namespace, config: Mapping[str, Any], *, config_base: Path | None, project_root: Path
-) -> RuntimeOptions:
-    ctx = _ResolverContext(parsed=parsed, config=config)
-
+def _resolve_primary_inputs(ctx: _ResolverContext) -> tuple[list[str], str, int, str | None]:
     symbols = _resolve_symbols_arg(ctx)
-    source = str(getattr(parsed, "source", None) or ctx.config.get("source") or _DEFAULT_SOURCE)
+    source = str(getattr(ctx.parsed, "source", None) or ctx.config.get("source") or _DEFAULT_SOURCE)
     days = _resolve_days(ctx)
-    export_ics = getattr(parsed, "export_ics", None) or ctx.config.get("export_ics")
+    export_ics = getattr(ctx.parsed, "export_ics", None) or ctx.config.get("export_ics")
+    return symbols, source, days, export_ics
 
+
+def _resolve_time_settings(
+    ctx: _ResolverContext,
+    *,
+    config_base: Path | None,
+    project_root: Path,
+) -> tuple[_GoogleOptions, str, str, int, dict[str, str]]:
     google_opts = _resolve_google_options(ctx, config_base=config_base, project_root=project_root)
-
     source_timezone = _resolve_timezone(
         ctx, "source_tz", config_key="source_timezone", env_key=_ENV_KEY_SOURCE_TZ, default=DEFAULT_SOURCE_TIMEZONE
     )
     target_timezone = _resolve_timezone(
         ctx, "target_tz", config_key="target_timezone", env_key=_ENV_KEY_TARGET_TZ, default=DEFAULT_TARGET_TIMEZONE
     )
-
     event_duration = _resolve_event_duration(ctx)
-
     session_time_map = _parse_session_times(
-        getattr(parsed, "session_times", None) or ctx.config.get("session_times") or os.getenv(_ENV_KEY_SESSION_TIMES),
+        getattr(ctx.parsed, "session_times", None) or ctx.config.get("session_times") or os.getenv(_ENV_KEY_SESSION_TIMES),
         default=DEFAULT_SESSION_TIMES,
     )
+    return google_opts, str(source_timezone), str(target_timezone), event_duration, session_time_map
 
+
+def _resolve_delivery_flags(ctx: _ResolverContext) -> tuple[bool, bool, bool]:
     market_events = _resolve_flag(
         ctx, "market_events", config_key="market_events", env_key=_ENV_KEY_MARKET_EVENTS, default=False
     )
@@ -485,23 +489,36 @@ def build_runtime_options(
     icloud_insert = _resolve_flag(
         ctx, "icloud_insert", config_key="icloud_insert", env_key=_ENV_KEY_ICLOUD_INSERT, default=False
     )
+    return market_events, google_insert, icloud_insert
 
+
+def _resolve_icloud_options(ctx: _ResolverContext) -> tuple[str | None, str | None]:
     icloud_id = _resolve_optional_str(ctx, "icloud_id", config_key="icloud_id", env_key=_ENV_KEY_ICLOUD_ID)
     icloud_app_pass = _resolve_optional_str(
         ctx, "icloud_app_pass", config_key="icloud_app_pass", env_key=_ENV_KEY_ICLOUD_APP_PASS
     )
+    return icloud_id, icloud_app_pass
 
+
+def _resolve_macro_options(ctx: _ResolverContext, primary_source: str) -> tuple[bool, list[str], str, str | None]:
     macro_events = _resolve_flag(
         ctx, "macro_events", config_key="macro_events", env_key=_ENV_KEY_MACRO_EVENTS, default=False
     )
     macro_event_keywords = _resolve_macro_keywords(ctx)
     macro_event_source = _resolve_macro_source(ctx)
-    fallback_source = _resolve_fallback_source(ctx, source)
+    fallback_source = _resolve_fallback_source(ctx, primary_source)
+    return macro_events, macro_event_keywords, macro_event_source, fallback_source
 
+
+def _resolve_sync_state(
+    ctx: _ResolverContext,
+    *,
+    config_base: Path | None,
+    project_root: Path,
+) -> tuple[bool, str | None]:
     incremental_sync = _resolve_flag(
         ctx, "incremental", config_key="incremental_sync", env_key=_ENV_KEY_INCREMENTAL_SYNC, default=False
     )
-
     raw_sync_state_path = _resolve_optional_str(
         ctx, "sync_state_path", config_key="sync_state_path", env_key=_ENV_KEY_SYNC_STATE_PATH
     )
@@ -510,6 +527,22 @@ def build_runtime_options(
     sync_state_path = (
         _resolve_path(raw_sync_state_path, base=config_base, root=project_root) if raw_sync_state_path else None
     )
+    return incremental_sync, str(sync_state_path) if sync_state_path is not None else None
+
+
+def build_runtime_options(
+    parsed: argparse.Namespace, config: Mapping[str, Any], *, config_base: Path | None, project_root: Path
+) -> RuntimeOptions:
+    ctx = _ResolverContext(parsed=parsed, config=config)
+
+    symbols, source, days, export_ics = _resolve_primary_inputs(ctx)
+    google_opts, source_timezone, target_timezone, event_duration, session_time_map = _resolve_time_settings(
+        ctx, config_base=config_base, project_root=project_root
+    )
+    market_events, google_insert, icloud_insert = _resolve_delivery_flags(ctx)
+    icloud_id, icloud_app_pass = _resolve_icloud_options(ctx)
+    macro_events, macro_event_keywords, macro_event_source, fallback_source = _resolve_macro_options(ctx, source)
+    incremental_sync, sync_state_path = _resolve_sync_state(ctx, config_base=config_base, project_root=project_root)
 
     options = RuntimeOptions(
         symbols=symbols,
@@ -522,8 +555,8 @@ def build_runtime_options(
         google_calendar_id=google_opts.calendar_id,
         google_calendar_name=google_opts.calendar_name,
         google_create_calendar=google_opts.create_if_missing,
-        source_timezone=str(source_timezone),
-        target_timezone=str(target_timezone),
+        source_timezone=source_timezone,
+        target_timezone=target_timezone,
         event_duration_minutes=event_duration,
         session_time_map=session_time_map,
         market_events=market_events,
@@ -534,7 +567,7 @@ def build_runtime_options(
         macro_event_keywords=macro_event_keywords,
         macro_event_source=macro_event_source,
         incremental_sync=incremental_sync,
-        sync_state_path=str(sync_state_path) if sync_state_path is not None else None,
+        sync_state_path=sync_state_path,
         fallback_source=fallback_source,
     )
 
