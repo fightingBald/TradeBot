@@ -29,6 +29,15 @@
 * 不承诺预测未来。
 * 不自动下单交易流动性差的期权（默认只用于分析/避雷）。
 
+### 当前阶段（Local Desktop MVP）
+
+* 本地桌面运行，Alpaca 单券商（paper/live）。
+* 可视化持仓分布（仓位/权重/盈亏）。
+* GUI 一键清仓（Kill Switch）+ 二次确认。
+* 暂不接入外部数据源，仅用券商账户/持仓数据。
+* 存储先本地轻量化，但保留 StoragePort 接口以便未来接外部 DB。
+* 结构化日志 + 关键风控动作留痕。
+
 ---
 
 ## 1. 标的清单（Watchlist / Holdings）
@@ -116,6 +125,8 @@ AMD, ASML, AVGO, BULL, COIN, CRCL, CRWV, FIG, GOOGL, HOOD, IBKR, ICE, META, MRVL
 
 > 机器人所有动作都必须带上 `profile_id`，不然你迟早把真仓当模拟仓砍了。
 
+* Phase 0A：可以只有一个 profile，但 `profile_id` 仍是必填字段（便于未来扩展）。
+
 ### 4.2 Broker Adapter（券商适配器）
 
 执行层必须变成“插拔式”：
@@ -158,6 +169,8 @@ AMD, ASML, AVGO, BULL, COIN, CRCL, CRWV, FIG, GOOGL, HOOD, IBKR, ICE, META, MRVL
 ## 5. 数据源插件化（随时加“情报”，核心不改）
 
 > 目标：你未来想加 earnings / insider / congress / coinglass / polymarket / 期权链 / 新闻… **都只加插件**，不去改核心逻辑。
+
+* Phase 0A：暂不接入外部数据源，仅保留接口定义或空实现。
 
 ### 5.1 DataSource Plugin（数据源插件）
 
@@ -353,6 +366,8 @@ AMD, ASML, AVGO, BULL, COIN, CRCL, CRWV, FIG, GOOGL, HOOD, IBKR, ICE, META, MRVL
 
 ## 12. 存储与日志（黑匣子）
 
+* Phase 0A：先本地落地（SQLite/JSONL 均可），对外暴露 StoragePort 接口；日志采用结构化格式并包含 `profile_id`、环境与动作类型。
+
 ### 最小表/集合
 
 * `positions_snapshots`
@@ -391,13 +406,21 @@ AMD, ASML, AVGO, BULL, COIN, CRCL, CRWV, FIG, GOOGL, HOOD, IBKR, ICE, META, MRVL
 
 ## 14. MVP 里程碑（野蛮启动）
 
+### Phase 0A（Local Desktop MVP）
+
+* Alpaca 连接（单券商）+ Trading Profile 最小实现。
+* 可视化持仓分布（本地 GUI）。
+* GUI 一键清仓（Kill Switch）+ live 二次确认。
+* 订单状态机最小闭环（下单/撤单/成交同步）。
+* 本地落库/日志留痕（未来可替换为外部 DB）。
+
 ### Phase 0（先活）
 
-* IBKR 连接
-* 拉持仓/现金/挂单
-* 自动卖出触发
-* Kill Switch
-* 订单状态机
+* BrokerAdapter 抽象 + 第二券商接入（如 IBKR）。
+* 多账号拉持仓/现金/挂单。
+* 自动卖出触发。
+* Kill Switch。
+* 订单状态机强化（撤单/改单/幂等/回执对账）。
 
 ### Phase 1（能盯）
 

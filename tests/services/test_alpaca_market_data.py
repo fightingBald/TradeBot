@@ -104,3 +104,86 @@ def test_get_user_positions_wraps_api_errors(monkeypatch) -> None:
         service.get_user_positions()
 
     assert "Failed to fetch positions" in str(excinfo.value)
+
+
+def test_cancel_open_orders_wraps_api_errors(monkeypatch) -> None:
+    class DummyAPIError(Exception):
+        pass
+
+    class DummyTradingClient:
+        def __init__(self, **_: Any) -> None:
+            pass
+
+        def cancel_orders(self) -> list[Any]:
+            raise DummyAPIError("boom")
+
+        def get_all_positions(self) -> list[Any]:
+            return []
+
+    monkeypatch.setattr("app.services.alpaca_market_data.TradingClient", DummyTradingClient)
+    monkeypatch.setattr("app.services.alpaca_market_data.APIError", DummyAPIError)
+    monkeypatch.setenv("ALPACA_API_KEY", "key")
+    monkeypatch.setenv("ALPACA_API_SECRET", "secret")
+
+    settings = Settings()
+    service = AlpacaMarketDataService(settings)
+
+    with pytest.raises(RuntimeError) as excinfo:
+        service.cancel_open_orders()
+
+    assert "Failed to cancel orders" in str(excinfo.value)
+
+
+def test_close_all_positions_passes_cancel_orders(monkeypatch) -> None:
+    created_clients: list[Any] = []
+
+    class DummyTradingClient:
+        def __init__(self, **_: Any) -> None:
+            self.cancel_orders_value: bool | None = None
+            created_clients.append(self)
+
+        def close_all_positions(self, cancel_orders: bool | None = None) -> list[Any]:
+            self.cancel_orders_value = cancel_orders
+            return []
+
+        def get_all_positions(self) -> list[Any]:
+            return []
+
+    monkeypatch.setattr("app.services.alpaca_market_data.TradingClient", DummyTradingClient)
+    monkeypatch.setenv("ALPACA_API_KEY", "key")
+    monkeypatch.setenv("ALPACA_API_SECRET", "secret")
+
+    settings = Settings()
+    service = AlpacaMarketDataService(settings)
+
+    service.close_all_positions(cancel_orders=False)
+
+    assert created_clients[0].cancel_orders_value is False
+
+
+def test_close_all_positions_wraps_api_errors(monkeypatch) -> None:
+    class DummyAPIError(Exception):
+        pass
+
+    class DummyTradingClient:
+        def __init__(self, **_: Any) -> None:
+            pass
+
+        def close_all_positions(self, cancel_orders: bool | None = None) -> list[Any]:
+            raise DummyAPIError("boom")
+
+        def get_all_positions(self) -> list[Any]:
+            return []
+
+    monkeypatch.setattr("app.services.alpaca_market_data.TradingClient", DummyTradingClient)
+    monkeypatch.setattr("app.services.alpaca_market_data.APIError", DummyAPIError)
+    monkeypatch.setenv("ALPACA_API_KEY", "key")
+    monkeypatch.setenv("ALPACA_API_SECRET", "secret")
+
+    settings = Settings()
+    service = AlpacaMarketDataService(settings)
+
+    with pytest.raises(RuntimeError) as excinfo:
+        service.close_all_positions()
+
+    assert "Failed to close positions" in str(excinfo.value)

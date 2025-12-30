@@ -9,6 +9,14 @@
 *  半人马模式最适合散户 机器砍手，我扣扳机
 *  系统设计要允许多账号papaer tarding ， real trading 切换
 * GUI 可以用streamlit
+
+## 当前阶段（Local Desktop MVP）
+- 仅接入 Alpaca（paper/live），先把持仓读取与展示做稳。
+- 本地 GUI 展示持仓分布与盈亏。
+- GUI 一键清仓（Kill Switch）+ live 二次确认。
+- 外部数据源与外部 DB 暂不接入，但保留接口以便后续扩展。
+- 结构化日志记录关键动作与环境信息。
+
 ## 环境/账号要求
 - Python 3.10 以上（本地推荐装成 `.venv`）。
 - Alpaca 账号和一对 API Key（写入 `.env` 或环境变量）。
@@ -46,6 +54,13 @@ uvicorn app.main:app --reload
 - `GET /quotes`：实时报价，可加 `?symbols=AAPL&symbols=MSFT`。
 - `GET /positions`：读取账户持仓（需要交易端权限）。
 - `GET /`：五秒刷一次的热力图 Dashboard。
+
+## 跑 Streamlit GUI（持仓分布 + 一键清仓）
+```bash
+source .venv/bin/activate
+streamlit run app/streamlit_app.py
+```
+提示：live 环境需要二次确认口令；执行 Kill Switch 会撤单并平掉全部持仓。
 
 ## Earnings Calendar CLI（财报/宏观日历）
 - 命令：`earnings-calendar`（安装 `pip install -e .` 后自动带上），也可以 `python -m py_scripts.calendar.run`。
@@ -90,7 +105,7 @@ earnings-calendar --symbols=AAPL,MSFT --days=60 --export-ics=earnings.ics
 改动完建议起码跑 `build` / `lint` / `test` 各一次。
 
 ## 目录结构速览
-- `app/`：FastAPI（配置、模型、服务、模板）。
+- `app/`：FastAPI（配置、模型、服务、模板）+ Streamlit GUI。
 - `toolkits/`：通用业务模块（日历、ARK、通知等）。
 - `py_scripts/`：命令行脚本入口。
 - `config/`：TOML 配置（事件日历、邮件收件人）。

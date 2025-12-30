@@ -1,4 +1,5 @@
 import inspect
+import logging
 from collections.abc import Iterable
 from typing import Any
 
@@ -9,6 +10,8 @@ from alpaca.trading.client import TradingClient
 
 from app.config import Settings
 from app.models import UserPosition
+
+logger = logging.getLogger(__name__)
 
 
 class AlpacaMarketDataService:
@@ -71,3 +74,19 @@ class AlpacaMarketDataService:
             raise RuntimeError(f"Failed to fetch positions from Alpaca: {exc}") from exc
 
         return [UserPosition.from_alpaca(position) for position in positions]
+
+    def cancel_open_orders(self) -> list[Any] | dict[str, Any]:
+        """Cancel all open orders for the authenticated Alpaca account."""
+        try:
+            return self._trading_client.cancel_orders()
+        except APIError as exc:
+            logger.exception("Failed to cancel orders from Alpaca")
+            raise RuntimeError(f"Failed to cancel orders from Alpaca: {exc}") from exc
+
+    def close_all_positions(self, cancel_orders: bool | None = True) -> list[Any] | dict[str, Any]:
+        """Close all open positions for the authenticated Alpaca account."""
+        try:
+            return self._trading_client.close_all_positions(cancel_orders=cancel_orders)
+        except APIError as exc:
+            logger.exception("Failed to close positions from Alpaca")
+            raise RuntimeError(f"Failed to close positions from Alpaca: {exc}") from exc
