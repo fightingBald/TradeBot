@@ -16,7 +16,7 @@ class PositionRecord(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     profile_id: Mapped[str] = mapped_column(String(64), index=True)
-    symbol: Mapped[str] = mapped_column(String(16))
+    symbol: Mapped[str] = mapped_column(String(64))
     asset_id: Mapped[str] = mapped_column(String(64))
     asset_class: Mapped[str | None] = mapped_column(String(32), nullable=True)
     exchange: Mapped[str | None] = mapped_column(String(32), nullable=True)

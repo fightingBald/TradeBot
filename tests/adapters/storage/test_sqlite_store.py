@@ -41,3 +41,17 @@ def test_upsert_and_list_positions(tmp_path) -> None:
     assert [item.symbol for item in refreshed] == ["MSFT"]
 
     store.close()
+
+
+def test_upsert_accepts_long_symbol(tmp_path) -> None:
+    db_path = tmp_path / "engine.db"
+    store = SqliteStateStore(f"sqlite:///{db_path}")
+
+    long_symbol = "ORCL260618C00200000"
+    store.upsert_positions("alpha", [_position(long_symbol, market_value="5020", quantity="2")])
+
+    results = store.list_positions("alpha")
+
+    assert results[0].symbol == long_symbol
+
+    store.close()
