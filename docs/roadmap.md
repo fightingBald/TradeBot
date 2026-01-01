@@ -49,5 +49,6 @@
 ## Further TODO(not being considered right now)
 - 接入外部数据源（新闻/事件日历/期权链等）
 - 风控
-
+- Event Master" (事件主数据)
+- 怎么构建“单一事实源” (SSOT)
 
