@@ -46,6 +46,22 @@ class ConfirmOrderRequest(BaseModel):
     draft_id: str
 
 
+class TrailingStopBuyRequest(BaseModel):
+    profile_id: str = Field(default="default")
+    symbol: str
+    qty: float = Field(gt=0)
+    trail_percent: float | None = Field(default=None, gt=0)
+    client_order_id: str | None = None
+
+
+class TrailingStopLossRequest(BaseModel):
+    profile_id: str = Field(default="default")
+    symbol: str
+    qty: float | None = Field(default=None, gt=0)
+    trail_percent: float | None = Field(default=None, gt=0)
+    client_order_id: str | None = None
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     _configure_logging()
@@ -146,6 +162,34 @@ async def confirm_order(
 ) -> dict[str, Any]:
     command = Command(
         type=CommandType.CONFIRM_ORDER,
+        profile_id=request.profile_id,
+        payload=request.model_dump(),
+    )
+    await bus.publish(command)
+    return {"command_id": command.command_id}
+
+
+@app.post("/commands/trailing-stop-buy", summary="Trailing stop buy", status_code=status.HTTP_202_ACCEPTED)
+async def trailing_stop_buy(
+    request: TrailingStopBuyRequest,
+    bus: CommandBusDep,
+) -> dict[str, Any]:
+    command = Command(
+        type=CommandType.TRAILING_STOP_BUY,
+        profile_id=request.profile_id,
+        payload=request.model_dump(),
+    )
+    await bus.publish(command)
+    return {"command_id": command.command_id}
+
+
+@app.post("/commands/trailing-stop-loss", summary="Trailing stop loss", status_code=status.HTTP_202_ACCEPTED)
+async def trailing_stop_loss(
+    request: TrailingStopLossRequest,
+    bus: CommandBusDep,
+) -> dict[str, Any]:
+    command = Command(
+        type=CommandType.TRAILING_STOP_SELL,
         profile_id=request.profile_id,
         payload=request.model_dump(),
     )
