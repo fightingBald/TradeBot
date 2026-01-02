@@ -4,6 +4,7 @@ from collections.abc import Iterable, Mapping, Sequence
 from typing import Any
 
 from adapters.brokers.alpaca_service import AlpacaBrokerService
+from core.domain.order import Order, TrailingStopOrderRequest
 from core.domain.position import Position
 from core.ports.broker import BrokerPort
 from core.ports.market_data import MarketDataPort
@@ -27,3 +28,6 @@ class AlpacaBrokerAdapter(BrokerPort, MarketDataPort):
 
     def close_all_positions(self, cancel_orders: bool | None = True) -> list[Any] | Mapping[str, Any]:
         return self._service.close_all_positions(cancel_orders=cancel_orders)
+
+    def submit_trailing_stop_order(self, order: TrailingStopOrderRequest) -> Order:
+        return self._service.submit_trailing_stop_order(order)

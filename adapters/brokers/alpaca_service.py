@@ -7,7 +7,10 @@ from alpaca.common.exceptions import APIError
 from alpaca.data import StockHistoricalDataClient
 from alpaca.data.requests import StockLatestQuoteRequest
 from alpaca.trading.client import TradingClient
+from alpaca.trading.enums import OrderSide, TimeInForce
+from alpaca.trading.requests import TrailingStopOrderRequest as AlpacaTrailingStopOrderRequest
 
+from core.domain.order import Order, TrailingStopOrderRequest
 from core.domain.position import Position
 from core.settings import Settings
 
@@ -90,3 +93,24 @@ class AlpacaBrokerService:
         except APIError as exc:
             logger.exception("Failed to close positions from Alpaca")
             raise RuntimeError(f"Failed to close positions from Alpaca: {exc}") from exc
+
+    def submit_trailing_stop_order(self, order: TrailingStopOrderRequest) -> Order:
+        """Submit a trailing stop order (buy/sell) via Alpaca."""
+        side = OrderSide.BUY if order.side.value == "buy" else OrderSide.SELL
+        tif = TimeInForce.DAY if order.time_in_force.value == "day" else TimeInForce.GTC
+        request = AlpacaTrailingStopOrderRequest(
+            symbol=order.symbol,
+            qty=str(order.qty),
+            side=side,
+            time_in_force=tif,
+            trail_percent=float(order.trail_percent),
+            extended_hours=order.extended_hours,
+            client_order_id=order.client_order_id,
+        )
+        try:
+            response = self._trading_client.submit_order(request)
+        except APIError as exc:
+            logger.exception("Failed to submit trailing stop order")
+            raise RuntimeError(f"Failed to submit trailing stop order: {exc}") from exc
+
+        return Order.from_alpaca(response)
