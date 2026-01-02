@@ -28,7 +28,7 @@
 - Pydantic settings：统一环境变量配置。
 
 ## 环境/账号要求
-- Python 3.10 以上（本地推荐装成 `.venv`）。
+- Python 3.13 以上（本地推荐装成 `.venv`）。
 - uv（Python 包管理器）。
 - Alpaca 账号和一对 API Key（写入环境变量）。
 - Redis（本地或容器）。

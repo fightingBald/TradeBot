@@ -30,7 +30,7 @@ Shared domain and interfaces live in `core/`, with concrete implementations in `
 - Structured logs for key actions and environment context.
 
 ## Requirements
-- Python 3.10+
+- Python 3.13+
 - uv (Python package manager)
 - Alpaca account and API keys
 - Redis (local or container)
