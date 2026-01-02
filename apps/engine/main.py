@@ -51,11 +51,13 @@ async def run_engine() -> None:
 
     tasks = [
         asyncio.create_task(_sync_positions_loop(sync_context, refresh_event)),
-        asyncio.create_task(_command_loop(bus, broker, store, settings.engine_profile_id)),
+        asyncio.create_task(_command_loop(bus, broker, store, settings)),
     ]
 
     if settings.engine_enable_trading_ws:
-        tasks.append(asyncio.create_task(asyncio.to_thread(_run_trading_stream, settings, loop, refresh_event)))
+        tasks.append(
+            asyncio.create_task(asyncio.to_thread(_run_trading_stream, settings, loop, refresh_event, broker, store))
+        )
     else:
         logger.info("Trading WS disabled")
 
