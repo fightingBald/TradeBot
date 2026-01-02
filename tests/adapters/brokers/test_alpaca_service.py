@@ -4,6 +4,7 @@ from typing import Any
 import pytest
 
 from adapters.brokers.alpaca_service import AlpacaBrokerService
+from core.domain.order import OrderSide, TimeInForce, TrailingStopOrderRequest
 from core.settings import Settings
 
 
@@ -292,3 +293,87 @@ def test_get_latest_quotes_wraps_api_errors(monkeypatch) -> None:
         service.get_latest_quotes(["AAPL"])
 
     assert "Failed to fetch quotes" in str(excinfo.value)
+
+
+def test_submit_trailing_stop_order_builds_request(monkeypatch) -> None:
+    created_requests: list[object] = []
+
+    class DummyTradingClient:
+        def __init__(self, **_: Any) -> None:
+            pass
+
+        def submit_order(self, request: object) -> dict[str, Any]:
+            created_requests.append(request)
+            return {
+                "id": "order-1",
+                "client_order_id": "client-1",
+                "symbol": "AAPL",
+                "side": "buy",
+                "type": "trailing_stop",
+                "time_in_force": "day",
+                "status": "accepted",
+                "qty": "1",
+                "trail_percent": "2",
+            }
+
+        def get_all_positions(self) -> list[Any]:
+            return []
+
+    monkeypatch.setattr("adapters.brokers.alpaca_service.TradingClient", DummyTradingClient)
+    monkeypatch.setenv("ALPACA_API_KEY", "key")
+    monkeypatch.setenv("ALPACA_API_SECRET", "secret")
+
+    settings = Settings()
+    service = AlpacaBrokerService(settings)
+    order = service.submit_trailing_stop_order(
+        TrailingStopOrderRequest(
+            symbol="AAPL",
+            side=OrderSide.BUY,
+            qty="1",
+            trail_percent="2",
+            time_in_force=TimeInForce.DAY,
+            extended_hours=False,
+            client_order_id="client-1",
+        )
+    )
+
+    assert order.order_id == "order-1"
+    assert created_requests
+
+
+def test_submit_trailing_stop_order_wraps_api_errors(monkeypatch) -> None:
+    class DummyAPIError(Exception):
+        pass
+
+    class DummyTradingClient:
+        def __init__(self, **_: Any) -> None:
+            pass
+
+        def submit_order(self, _request: object) -> dict[str, Any]:
+            raise DummyAPIError("boom")
+
+        def get_all_positions(self) -> list[Any]:
+            return []
+
+    monkeypatch.setattr("adapters.brokers.alpaca_service.TradingClient", DummyTradingClient)
+    monkeypatch.setattr("adapters.brokers.alpaca_service.APIError", DummyAPIError)
+    monkeypatch.setenv("ALPACA_API_KEY", "key")
+    monkeypatch.setenv("ALPACA_API_SECRET", "secret")
+
+    settings = Settings()
+    service = AlpacaBrokerService(settings)
+
+    with pytest.raises(RuntimeError) as excinfo:
+        service.submit_trailing_stop_order(
+            TrailingStopOrderRequest(
+                symbol="AAPL",
+                side=OrderSide.BUY,
+                qty="1",
+                trail_percent="2",
+                time_in_force=TimeInForce.DAY,
+                extended_hours=False,
+                client_order_id="client-1",
+            )
+        )
+
+    assert "Failed to submit trailing stop order" in str(excinfo.value)

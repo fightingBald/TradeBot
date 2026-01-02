@@ -3,6 +3,7 @@ from __future__ import annotations
 from decimal import Decimal
 
 from adapters.storage.sqlalchemy_state_store import SqlAlchemyStateStore
+from core.domain.order import Fill, Order
 from core.domain.position import Position
 
 
@@ -53,5 +54,41 @@ def test_upsert_accepts_long_symbol(tmp_path) -> None:
     results = store.list_positions("alpha")
 
     assert results[0].symbol == long_symbol
+
+    store.close()
+
+
+def test_upsert_and_list_orders_and_fills(tmp_path) -> None:
+    db_path = tmp_path / "engine.db"
+    store = SqlAlchemyStateStore(f"sqlite:///{db_path}")
+
+    order = Order(
+        order_id="order-1",
+        client_order_id="client-1",
+        symbol="AAPL",
+        side="buy",
+        order_type="trailing_stop",
+        time_in_force="day",
+        status="accepted",
+        qty="1",
+        filled_qty="0",
+        trail_percent="2",
+    )
+    store.upsert_order("alpha", order, source="ui")
+
+    refreshed = store.list_orders("alpha")
+    assert refreshed[0].order_id == "order-1"
+    assert refreshed[0].trail_percent == Decimal("2")
+
+    fill = Fill(order_id="order-1", symbol="AAPL", side="buy", qty="1", price="101.5")
+    store.record_fill("alpha", fill)
+
+    fills = store.list_fills("alpha")
+    assert fills[0].order_id == "order-1"
+    assert fills[0].price == Decimal("101.5")
+
+    assert store.has_protection_link("alpha", "order-1") is False
+    store.create_protection_link("alpha", "order-1", "order-2")
+    assert store.has_protection_link("alpha", "order-1") is True
 
     store.close()

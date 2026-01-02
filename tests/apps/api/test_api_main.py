@@ -142,3 +142,20 @@ def test_draft_and_confirm_publish_commands(monkeypatch: pytest.MonkeyPatch) -> 
     assert confirm_response.status_code == 202
     published = client.app.state.command_bus.published
     assert [cmd.type for cmd in published] == [CommandType.DRAFT_ORDER, CommandType.CONFIRM_ORDER]
+
+
+def test_trailing_stop_endpoints_publish_commands(monkeypatch: pytest.MonkeyPatch) -> None:
+    with _build_client(monkeypatch) as client:
+        buy_response = client.post(
+            "/commands/trailing-stop-buy",
+            json={"profile_id": "default", "symbol": "AAPL", "qty": 1, "trail_percent": 2},
+        )
+        sell_response = client.post(
+            "/commands/trailing-stop-loss",
+            json={"profile_id": "default", "symbol": "AAPL"},
+        )
+
+    assert buy_response.status_code == 202
+    assert sell_response.status_code == 202
+    published = client.app.state.command_bus.published
+    assert [cmd.type for cmd in published][-2:] == [CommandType.TRAILING_STOP_BUY, CommandType.TRAILING_STOP_SELL]
