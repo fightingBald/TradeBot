@@ -58,6 +58,12 @@ class Order(BaseModel):
             raw["order_type"] = raw["type"]
         if "quantity" not in raw and "qty" in raw:
             raw["quantity"] = raw["qty"]
+        if "side" in raw:
+            raw["side"] = _normalize_enum_text(raw["side"])
+        if "order_type" in raw:
+            raw["order_type"] = _normalize_enum_text(raw["order_type"])
+        if "time_in_force" in raw and raw["time_in_force"] is not None:
+            raw["time_in_force"] = _normalize_enum_text(raw["time_in_force"])
 
         return cls.model_validate(raw)
 
@@ -87,6 +93,15 @@ class TrailingStopOrderRequest(BaseModel):
     client_order_id: str | None = None
 
     model_config = ConfigDict(arbitrary_types_allowed=False)
+
+
+def _normalize_enum_text(value: Any) -> str:
+    if hasattr(value, "value"):
+        return str(value.value).lower()
+    text = str(value)
+    if "." in text:
+        text = text.split(".")[-1]
+    return text.lower()
 
 
 __all__ = ["Fill", "Order", "OrderSide", "TimeInForce", "TrailingStopOrderRequest"]
