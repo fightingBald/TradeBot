@@ -30,6 +30,11 @@ _KNOWN_ENGINE_ENV_KEYS = {
     "ENGINE_PROFILE_ID",
     "ENGINE_ENABLE_TRADING_WS",
     "ENGINE_TRADING_WS_MAX_BACKOFF_SECONDS",
+    "ENGINE_TRAILING_DEFAULT_PERCENT",
+    "ENGINE_TRAILING_BUY_TIF",
+    "ENGINE_TRAILING_SELL_TIF",
+    "ENGINE_AUTO_PROTECT_ENABLED",
+    "ENGINE_AUTO_PROTECT_ORDER_TYPES",
 }
 
 
@@ -135,6 +140,31 @@ class Settings(BaseSettings):
             "engine_trading_ws_backoff_max",
         ),
     )
+    engine_trailing_default_percent: float = Field(
+        default=2.0,
+        ge=0.01,
+        validation_alias=AliasChoices(
+            "engine_trailing_default_percent",
+            "ENGINE_TRAILING_DEFAULT_PERCENT",
+            "trailing_default_percent",
+        ),
+    )
+    engine_trailing_buy_tif: str = Field(
+        default="day",
+        validation_alias=AliasChoices("engine_trailing_buy_tif", "ENGINE_TRAILING_BUY_TIF"),
+    )
+    engine_trailing_sell_tif: str = Field(
+        default="gtc",
+        validation_alias=AliasChoices("engine_trailing_sell_tif", "ENGINE_TRAILING_SELL_TIF"),
+    )
+    engine_auto_protect_enabled: bool = Field(
+        default=True,
+        validation_alias=AliasChoices("engine_auto_protect_enabled", "ENGINE_AUTO_PROTECT_ENABLED"),
+    )
+    engine_auto_protect_order_types: list[str] = Field(
+        default_factory=lambda: ["market", "limit", "stop", "stop_limit", "trailing_stop"],
+        validation_alias=AliasChoices("engine_auto_protect_order_types", "ENGINE_AUTO_PROTECT_ORDER_TYPES"),
+    )
 
     @field_validator("data_feed")
     @classmethod
@@ -143,6 +173,23 @@ class Settings(BaseSettings):
         if feed not in {"iex", "sip"}:
             logger.warning("ALPACA_DATA_FEED=%s is unusual; expected 'iex' or 'sip'", value)
         return feed
+
+    @field_validator("engine_trailing_buy_tif", "engine_trailing_sell_tif")
+    @classmethod
+    def _validate_trailing_tif(cls, value: str) -> str:
+        tif = value.strip().lower()
+        if tif not in {"day", "gtc"}:
+            logger.warning("Trailing TIF=%s is unusual; expected 'day' or 'gtc'", value)
+        return tif
+
+    @field_validator("engine_auto_protect_order_types", mode="before")
+    @classmethod
+    def _parse_auto_protect_order_types(cls, value: object) -> list[str]:
+        if isinstance(value, str):
+            return [item.strip().lower() for item in value.split(",") if item.strip()]
+        if isinstance(value, list):
+            return [str(item).strip().lower() for item in value if str(item).strip()]
+        return []
 
     @model_validator(mode="after")
     def _apply_defaults_and_warn(self) -> "Settings":

@@ -12,6 +12,8 @@ class CommandType(str, Enum):
     KILL_SWITCH = "kill_switch"
     DRAFT_ORDER = "draft_order"
     CONFIRM_ORDER = "confirm_order"
+    TRAILING_STOP_BUY = "trailing_stop_buy"
+    TRAILING_STOP_SELL = "trailing_stop_sell"
 
 
 class Command(BaseModel):
