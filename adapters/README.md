@@ -9,8 +9,8 @@ Adapters implement the core ports and isolate external SDKs.
 
 ## Storage
 
-`adapters/storage/sqlalchemy_state_store.py` persists positions snapshots via SQLAlchemy
-(SQLite locally, Postgres in Docker Compose).
+`adapters/storage/sqlalchemy_state_store.py` persists positions, orders, fills, and
+protection links via SQLAlchemy (SQLite locally, Postgres in Docker Compose).
 
 ## Messaging
 

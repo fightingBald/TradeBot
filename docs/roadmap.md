@@ -39,6 +39,7 @@
 - **成交后自动保护（核心）**
   - 任意 Stop Buy 一旦成交（包括你网页手动下的单），机器人自动挂 **Trailing Stop 卖出保护单**
   - 保护单挂单失败必须告警，并执行一个最小保命降级（先不复杂）
+  - 默认规则：Trailing Stop Buy = DAY；Trailing Stop Loss = GTC；extended_hours=false
 - **硬风控**
   - Kill Switch：一键清仓/停机
   - 基础风险限制：最大仓位、单笔最大风险（先能挡住大坑）

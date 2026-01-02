@@ -26,6 +26,7 @@ Shared domain and interfaces live in `core/`, with concrete implementations in `
 - Alpaca integration only (paper/live).
 - Position distribution and PnL visualization in the GUI.
 - Kill switch with a confirmation step for live trading.
+- Trailing stop buy/sell (default 2%); auto-protect adds trailing stop loss on filled buys.
 - No external data sources yet; local default is SQLite while Docker uses Postgres.
 - Structured logs for key actions and environment context.
 
@@ -61,7 +62,13 @@ ENGINE_POLL_INTERVAL_SECONDS=10
 ENGINE_SYNC_MIN_INTERVAL_SECONDS=3
 ENGINE_ENABLE_TRADING_WS=true
 ENGINE_TRADING_WS_MAX_BACKOFF_SECONDS=30
+ENGINE_TRAILING_DEFAULT_PERCENT=2
+ENGINE_TRAILING_BUY_TIF=day
+ENGINE_TRAILING_SELL_TIF=gtc
+ENGINE_AUTO_PROTECT_ENABLED=true
+ENGINE_AUTO_PROTECT_ORDER_TYPES=market,limit,stop,stop_limit,trailing_stop
 ```
+`ENGINE_TRAILING_DEFAULT_PERCENT` and `trail_percent` are expressed in percent points (2 = 2%).
 
 ## Run (Local)
 Migrations:
@@ -113,10 +120,13 @@ Note: UI talks to FastAPI only; Engine owns the broker/WebSocket connection.
 - `POST /commands/draft` stage a command
 - `POST /commands/confirm` confirm staged command
 - `POST /commands/kill-switch` emergency liquidation request
+- `POST /commands/trailing-stop-buy` submit a trailing stop buy (default 2%)
+- `POST /commands/trailing-stop-loss` submit a trailing stop loss (default 2%)
 
 ## Execution & State Strategy (Current)
 - Engine owns the single trading WebSocket connection (free-plan friendly).
 - `trade_updates` triggers an immediate position refresh; periodic polling remains as reconciliation.
+- Filled buy orders trigger auto-protect (submit trailing stop loss) when enabled.
 - Position sync is throttled by `ENGINE_SYNC_MIN_INTERVAL_SECONDS` to respect rate limits.
 - WebSocket reconnect uses exponential backoff with jitter (`ENGINE_TRADING_WS_MAX_BACKOFF_SECONDS`).
 - UI uses FastAPI only and never talks directly to the broker.

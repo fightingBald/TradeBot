@@ -57,12 +57,18 @@ ENGINE_POLL_INTERVAL_SECONDS=10
 ENGINE_SYNC_MIN_INTERVAL_SECONDS=3
 ENGINE_ENABLE_TRADING_WS=true
 ENGINE_TRADING_WS_MAX_BACKOFF_SECONDS=30
+ENGINE_TRAILING_DEFAULT_PERCENT=2
+ENGINE_TRAILING_BUY_TIF=day
+ENGINE_TRAILING_SELL_TIF=gtc
+ENGINE_AUTO_PROTECT_ENABLED=true
+ENGINE_AUTO_PROTECT_ORDER_TYPES=market,limit,stop,stop_limit,trailing_stop
 FMP_API_KEY=xxx
 FINNHUB_API_KEY=xxx
 BENZINGA_API_KEY=xxx
 GOOGLE_CREDENTIALS_PATH=secrets/credentials.json
 GOOGLE_TOKEN_PATH=secrets/token.json
 ```
+说明：`ENGINE_TRAILING_DEFAULT_PERCENT` 与 API 的 `trail_percent` 都是“百分比数值”（2 代表 2%）。
 
 ## 跑 FastAPI 服务
 ```bash
@@ -73,7 +79,7 @@ uvicorn apps.api.main:app --reload
 - `GET /health`：心跳。
 - `GET /state/profile`：当前 profile 与环境。
 - `GET /state/positions`：读取持仓快照（来自 Engine + SQLite）。
-- `POST /commands/*`：下发命令（draft/confirm/kill-switch）。
+- `POST /commands/*`：下发命令（draft/confirm/kill-switch/trailing-stop）。
 
 ## 跑 Engine
 ```bash
