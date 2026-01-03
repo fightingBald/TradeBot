@@ -69,6 +69,7 @@ GOOGLE_CREDENTIALS_PATH=secrets/credentials.json
 GOOGLE_TOKEN_PATH=secrets/token.json
 ```
 说明：`ENGINE_TRAILING_DEFAULT_PERCENT` 与 API 的 `trail_percent` 都是“百分比数值”（2 代表 2%）。
+注意：Alpaca 对碎股 trailing stop 要求 `DAY`，Engine 会在需要时自动覆盖 `GTC`。
 
 ## 跑 FastAPI 服务
 ```bash
@@ -87,6 +88,7 @@ source .venv/bin/activate
 python -m apps.engine.main
 ```
 说明：Engine 负责 WS + 轮询同步持仓并落库，命令通过 Redis 队列下发。
+买入成交后会自动补挂 trailing stop loss（默认 2%、GTC；碎股自动改为 DAY）。
 
 ## 数据库迁移
 ```bash

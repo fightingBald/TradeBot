@@ -69,6 +69,7 @@ ENGINE_AUTO_PROTECT_ENABLED=true
 ENGINE_AUTO_PROTECT_ORDER_TYPES=market,limit,stop,stop_limit,trailing_stop
 ```
 `ENGINE_TRAILING_DEFAULT_PERCENT` and `trail_percent` are expressed in percent points (2 = 2%).
+Note: Alpaca requires fractional trailing stop orders to use `DAY` TIF; the engine will override `GTC` when needed.
 
 ## Run (Local)
 Migrations:
