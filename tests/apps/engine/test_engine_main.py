@@ -12,7 +12,7 @@ import pytest
 import apps.engine.main as engine_main
 import apps.engine.streams as engine_streams
 from core.domain.commands import Command, CommandType
-from core.domain.order import Order, OrderSide, TrailingStopOrderRequest
+from core.domain.order import Order, OrderSide, TimeInForce, TrailingStopOrderRequest
 from core.domain.position import Position
 
 
@@ -166,6 +166,38 @@ def test_handle_command_trailing_stop_sell_uses_position_qty() -> None:
     assert broker.trailing_calls
     assert broker.trailing_calls[0].side is OrderSide.SELL
     assert broker.trailing_calls[0].qty == Decimal("2")
+
+
+def test_handle_command_trailing_stop_sell_fractional_forces_day_tif() -> None:
+    broker = DummyBroker()
+    store = DummyStore()
+    store.positions = [
+        Position(
+            symbol="AAPL",
+            asset_id="aapl-id",
+            side="long",
+            quantity="1.5",
+            avg_entry_price="10",
+            market_value="15",
+            cost_basis="15",
+        )
+    ]
+    command = Command(
+        type=CommandType.TRAILING_STOP_SELL,
+        profile_id="default",
+        payload={"symbol": "AAPL"},
+    )
+    settings = SimpleNamespace(
+        engine_profile_id="default",
+        engine_trailing_default_percent=2.0,
+        engine_trailing_buy_tif="day",
+        engine_trailing_sell_tif="gtc",
+    )
+
+    asyncio.run(engine_main._handle_command(command, broker, store, settings))
+
+    assert broker.trailing_calls
+    assert broker.trailing_calls[0].time_in_force is TimeInForce.DAY
 
 
 def test_sync_positions_loop_triggers_on_event() -> None:

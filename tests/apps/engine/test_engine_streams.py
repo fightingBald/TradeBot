@@ -4,7 +4,7 @@ from decimal import Decimal
 from types import SimpleNamespace
 
 from apps.engine.streams import process_trade_update
-from core.domain.order import Order, OrderSide, TrailingStopOrderRequest
+from core.domain.order import Order, OrderSide, TimeInForce, TrailingStopOrderRequest
 from core.domain.position import Position
 
 
@@ -74,8 +74,9 @@ def test_process_trade_update_creates_auto_protect_order() -> None:
         order={
             "id": "order-1",
             "symbol": "AAPL",
-            "side": "buy",
+            "side": "OrderSide.BUY",
             "type": "market",
+            "order_class": "simple",
             "filled_qty": "2",
             "filled_avg_price": "101.5",
             "status": "filled",
@@ -88,3 +89,65 @@ def test_process_trade_update_creates_auto_protect_order() -> None:
     assert broker.trailing_calls
     assert broker.trailing_calls[0].side is OrderSide.SELL
     assert broker.trailing_calls[0].qty == Decimal("2")
+    assert broker.trailing_calls[0].time_in_force is TimeInForce.GTC
+
+
+def test_process_trade_update_skips_bracket_order() -> None:
+    settings = SimpleNamespace(
+        engine_profile_id="default",
+        engine_auto_protect_enabled=True,
+        engine_auto_protect_order_types=["market"],
+        engine_trailing_default_percent=2.0,
+        engine_trailing_sell_tif="gtc",
+    )
+    broker = DummyBroker()
+    store = DummyStore()
+    data = SimpleNamespace(
+        event="fill",
+        order={
+            "id": "order-2",
+            "symbol": "AAPL",
+            "side": "buy",
+            "type": "market",
+            "order_class": "bracket",
+            "filled_qty": "2",
+            "filled_avg_price": "101.5",
+            "status": "filled",
+        },
+    )
+
+    process_trade_update(data, settings, broker, store)
+
+    assert store.protection_links == set()
+    assert broker.trailing_calls == []
+
+
+def test_process_trade_update_fractional_qty_forces_day_tif() -> None:
+    settings = SimpleNamespace(
+        engine_profile_id="default",
+        engine_auto_protect_enabled=True,
+        engine_auto_protect_order_types=["market"],
+        engine_trailing_default_percent=2.0,
+        engine_trailing_sell_tif="gtc",
+    )
+    broker = DummyBroker()
+    broker.positions[0].quantity = Decimal("1.5")
+    store = DummyStore()
+    data = SimpleNamespace(
+        event="fill",
+        order={
+            "id": "order-3",
+            "symbol": "AAPL",
+            "side": "OrderSide.BUY",
+            "type": "market",
+            "order_class": "simple",
+            "filled_qty": "1.5",
+            "filled_avg_price": "101.5",
+            "status": "filled",
+        },
+    )
+
+    process_trade_update(data, settings, broker, store)
+
+    assert broker.trailing_calls
+    assert broker.trailing_calls[0].time_in_force is TimeInForce.DAY
