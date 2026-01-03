@@ -8,6 +8,7 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Any
 
+from apps.engine.rules import coerce_tif_for_fractional
 from core.domain.order import Fill, Order, OrderSide, TimeInForce, TrailingStopOrderRequest
 from core.ports.broker import BrokerPort
 from core.ports.state_store import StateStore
@@ -41,23 +42,30 @@ def _parse_datetime(value: Any) -> datetime | None:
     return None
 
 
+def _normalize_enum_text(value: Any) -> str:
+    if hasattr(value, "value"):
+        return str(value.value).lower()
+    text = str(value)
+    if "." in text:
+        text = text.split(".")[-1]
+    return text.lower()
+
+
 def _order_type(payload: dict[str, Any]) -> str:
     raw = payload.get("order_type") or payload.get("type") or ""
-    return str(raw).lower()
+    return _normalize_enum_text(raw)
 
 
 def _order_side(payload: dict[str, Any]) -> str:
     raw = payload.get("side") or ""
-    return str(raw).lower()
+    return _normalize_enum_text(raw)
 
 
 def _has_bracket(payload: dict[str, Any]) -> bool:
-    return bool(
-        payload.get("order_class")
-        or payload.get("legs")
-        or payload.get("stop_loss")
-        or payload.get("take_profit")
-    )
+    order_class = str(payload.get("order_class") or "").lower()
+    if order_class in {"bracket", "oco", "oto"}:
+        return True
+    return bool(payload.get("legs") or payload.get("stop_loss") or payload.get("take_profit"))
 
 
 def _resolve_position_qty(broker: BrokerPort, symbol: str) -> Decimal | None:
@@ -70,7 +78,7 @@ def _resolve_position_qty(broker: BrokerPort, symbol: str) -> Decimal | None:
 def _build_fill_from_order(order_payload: dict[str, Any]) -> Fill | None:
     order_id = order_payload.get("id") or order_payload.get("order_id")
     symbol = order_payload.get("symbol")
-    side = order_payload.get("side")
+    side = _normalize_enum_text(order_payload.get("side") or "")
     qty = order_payload.get("filled_qty") or order_payload.get("filled_quantity") or order_payload.get("qty")
     price = order_payload.get("filled_avg_price") or order_payload.get("avg_fill_price")
     filled_at = (
@@ -84,7 +92,7 @@ def _build_fill_from_order(order_payload: dict[str, Any]) -> Fill | None:
     return Fill(
         order_id=str(order_id),
         symbol=str(symbol),
-        side=str(side),
+        side=side,
         qty=Decimal(str(qty)),
         price=Decimal(str(price)) if price is not None else None,
         filled_at=_parse_datetime(filled_at),
@@ -118,6 +126,7 @@ def _auto_protect_on_fill(
     except ValueError:
         logger.warning("Auto-protect unsupported sell TIF: %s", settings.engine_trailing_sell_tif)
         return
+    tif = coerce_tif_for_fractional(qty, tif, context="auto_protect")
 
     client_order_id = f"auto-protect-{str(order_id)[:20]}"
     request = TrailingStopOrderRequest(

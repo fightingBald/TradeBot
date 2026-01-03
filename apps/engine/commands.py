@@ -5,6 +5,7 @@ import logging
 from decimal import Decimal
 from uuid import uuid4
 
+from apps.engine.rules import coerce_tif_for_fractional
 from core.domain.commands import Command, CommandType
 from core.domain.order import OrderSide, TimeInForce, TrailingStopOrderRequest
 from core.ports.broker import BrokerPort
@@ -71,6 +72,7 @@ def _build_trailing_order(
         except ValueError:
             logger.warning("Unsupported trailing buy TIF: %s", settings.engine_trailing_buy_tif)
             return None
+        tif = coerce_tif_for_fractional(qty, tif, context="trailing_stop_buy")
     else:
         qty = _resolve_trailing_qty(payload, store, broker, settings)
         if qty is None or qty <= 0:
@@ -81,6 +83,7 @@ def _build_trailing_order(
         except ValueError:
             logger.warning("Unsupported trailing sell TIF: %s", settings.engine_trailing_sell_tif)
             return None
+        tif = coerce_tif_for_fractional(qty, tif, context="trailing_stop_loss")
 
     client_order_id = payload.get("client_order_id")
     if not client_order_id:
