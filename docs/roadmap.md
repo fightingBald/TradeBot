@@ -51,6 +51,7 @@
 - Alpaca only（paper/live，live 默认关闭）
 - 允许断线重连、重启恢复状态（不能重启就失忆）
 - UI 不直连券商：UI 只读 + 发命令；由后端统一对接券商与行情
+- Market data daemon 独占行情 WS（IEX），写入 Redis 热数据层
 - 有一个“热数据层”给 UI 秒开（不要求长期存）
 
 ---
@@ -64,6 +65,7 @@
 - Trailing Stop 参数策略（从固定 2% → 波动率自适应/按 symbol 分档）
 - SSOT 详细表结构（orders/fills/positions/protection_links/trailing_state…）
 - Redis key 设计、PubSub/Streams、缓存策略与 TTL
+- 行情订阅动态管理（watchlist 增删 / 自动重连 / 限流保护）
 - 市场日历/事件系统（Market Calendar / Event Master / 审计版本）
 - 外部数据源融合（新闻/事件日历/期权链/公司行为）
 - 多券商、多账号

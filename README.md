@@ -4,6 +4,7 @@ Local-first trading system focused on execution safety, state integrity, and hum
 
 ## Architecture
 - Engine: subscribes to Alpaca trading WebSocket, maintains state, enforces risk controls, and syncs positions to SQLite.
+- Market data daemon: owns the Alpaca market data WebSocket and caches quotes/trades/bars in Redis.
 - FastAPI: control plane; reads state for the UI, accepts commands, and orchestrates draft/confirm/kill-switch flows.
 - Streamlit: read-only UI for monitoring positions and issuing commands; never talks to the broker directly.
 
@@ -16,6 +17,7 @@ Shared domain and interfaces live in `core/`, with concrete implementations in `
 
 ## Technology Choices
 - Alpaca-py for trading REST and `trade_updates` WebSocket.
+- Alpaca-py market data WebSocket (IEX) with Redis cache for watchlist quotes/trades/bars.
 - FastAPI as the control plane (state queries + command orchestration).
 - Streamlit + Altair for a read-only desktop UI.
 - SQLite + SQLAlchemy + Alembic for local state; Postgres in Docker Compose.
@@ -25,6 +27,7 @@ Shared domain and interfaces live in `core/`, with concrete implementations in `
 ## Current Scope (Local Desktop MVP)
 - Alpaca integration only (paper/live).
 - Position distribution and PnL visualization in the GUI.
+- Watchlist market data (Level 1 quotes, last trade, 1-min bars) via the market data daemon.
 - Kill switch with a confirmation step for live trading.
 - Trailing stop buy/sell (default 2%); auto-protect adds trailing stop loss on filled buys.
 - No external data sources yet; local default is SQLite while Docker uses Postgres.
@@ -67,9 +70,22 @@ ENGINE_TRAILING_BUY_TIF=day
 ENGINE_TRAILING_SELL_TIF=gtc
 ENGINE_AUTO_PROTECT_ENABLED=true
 ENGINE_AUTO_PROTECT_ORDER_TYPES=market,limit,stop,stop_limit,trailing_stop
+MARKETDATA_STREAM_ENABLED=true
+MARKETDATA_SYMBOLS=AAPL,MSFT
+MARKETDATA_MAX_SYMBOLS=30
+MARKETDATA_SUBSCRIBE_QUOTES=true
+MARKETDATA_SUBSCRIBE_TRADES=true
+MARKETDATA_SUBSCRIBE_BARS=true
+MARKETDATA_BAR_TIMEFRAME=1Min
+MARKETDATA_BARS_MAX=120
+MARKETDATA_CACHE_TTL_SECONDS=30
+MARKETDATA_CACHE_NAMESPACE=marketdata
+MARKETDATA_WS_URL=
+MARKETDATA_WS_MAX_BACKOFF_SECONDS=30
 ```
 `ENGINE_TRAILING_DEFAULT_PERCENT` and `trail_percent` are expressed in percent points (2 = 2%).
 Note: Alpaca requires fractional trailing stop orders to use `DAY` TIF; the engine will override `GTC` when needed.
+Free plan note: realtime market data WebSocket uses IEX with a ~30 symbol limit.
 
 ## Run (Local)
 Migrations:
@@ -85,6 +101,11 @@ uvicorn apps.api.main:app --reload
 Engine:
 ```bash
 python -m apps.engine.main
+```
+
+Market data daemon:
+```bash
+python -m apps.marketdata.main
 ```
 
 Streamlit UI:
@@ -111,6 +132,7 @@ docker compose -f deploy/docker-compose.yml --profile live run --rm migrate-live
 docker compose -f deploy/docker-compose.yml --profile live up -d
 ```
 Ports: paper API `:8000`, paper UI `:8501`; live API `:8001`, live UI `:8502`.
+Note: the market data daemon starts with the profile and needs `MARKETDATA_SYMBOLS` set.
 
 Note: UI talks to FastAPI only; Engine owns the broker/WebSocket connection.
 
@@ -118,6 +140,10 @@ Note: UI talks to FastAPI only; Engine owns the broker/WebSocket connection.
 - `GET /health` health check
 - `GET /state/profile` active profile and environment
 - `GET /state/positions` position snapshot (from Engine + SQLite)
+- `GET /market-data/watchlist` watchlist symbols
+- `GET /market-data/quotes` latest quotes (cache)
+- `GET /market-data/trades` latest trades (cache)
+- `GET /market-data/bars` recent bars (cache)
 - `POST /commands/draft` stage a command
 - `POST /commands/confirm` confirm staged command
 - `POST /commands/kill-switch` emergency liquidation request
@@ -130,6 +156,7 @@ Note: UI talks to FastAPI only; Engine owns the broker/WebSocket connection.
 - Filled buy orders trigger auto-protect (submit trailing stop loss) when enabled.
 - Position sync is throttled by `ENGINE_SYNC_MIN_INTERVAL_SECONDS` to respect rate limits.
 - WebSocket reconnect uses exponential backoff with jitter (`ENGINE_TRADING_WS_MAX_BACKOFF_SECONDS`).
+- Market data daemon owns the single market data WebSocket and caches snapshots in Redis.
 - UI uses FastAPI only and never talks directly to the broker.
 
 ## Optional CLI Tools
@@ -143,10 +170,11 @@ make lint
 make test
 make coverage
 ```
-Coverage threshold: 80% on runtime modules (`apps/api`, `apps/engine`, `core`, `adapters`, `toolkits`).
+Coverage threshold: 80% on runtime modules (`apps/api`, `apps/engine`, `apps/marketdata`, `core`, `adapters`, `toolkits`).
 
 ## Directory Layout
 - `apps/` entrypoints (api/engine/ui)
+- `apps/marketdata/` market data daemon
 - `core/` domain models and ports
 - `adapters/` external system adapters (broker/storage/messaging)
 - `storage/` database migrations and schema

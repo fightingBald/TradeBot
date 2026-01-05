@@ -2,6 +2,7 @@
 
 ## 这套东西是干嘛的？
 * Engine 独立进程：订阅 WS + 管状态 + 风控自动卖出。
+* Market data daemon：独占行情 WS，把 quotes/trades/bars 写进 Redis 热数据层。
 * FastAPI：读状态给 UI + 接收命令 + 编排（draft/confirm/kill switch）。
 * Streamlit：只看 + 点按钮，不直接打券商。
 * 一堆脚本（`py_scripts/`）帮忙管仓位：批量设置止损、同步财报/宏观日历、抓 ARK ETF 持仓、发邮件。
@@ -15,12 +16,14 @@
 ## 当前阶段（Local Desktop MVP）
 - 仅接入 Alpaca（paper/live），先把持仓读取与展示做稳。
 - 本地 GUI 展示持仓分布与盈亏。
+- Watchlist 行情（Level1 quotes + last trade + 1-min bars）。
 - GUI 一键清仓（Kill Switch）+ live 二次确认。
 - 外部数据源暂不接入；本地默认 SQLite，Docker 可选 Postgres。
 - 结构化日志记录关键动作与环境信息。
 
 ## 技术选型
 - Alpaca-py：交易 REST + `trade_updates` WebSocket。
+- Alpaca-py 行情 WebSocket（IEX）+ Redis 缓存。
 - FastAPI：控制面（状态查询 + 命令编排）。
 - Streamlit + Altair：只读桌面 GUI。
 - SQLite + SQLAlchemy + Alembic：本地状态存储与迁移；Docker 可选 Postgres。
@@ -62,6 +65,18 @@ ENGINE_TRAILING_BUY_TIF=day
 ENGINE_TRAILING_SELL_TIF=gtc
 ENGINE_AUTO_PROTECT_ENABLED=true
 ENGINE_AUTO_PROTECT_ORDER_TYPES=market,limit,stop,stop_limit,trailing_stop
+MARKETDATA_STREAM_ENABLED=true
+MARKETDATA_SYMBOLS=AAPL,MSFT
+MARKETDATA_MAX_SYMBOLS=30
+MARKETDATA_SUBSCRIBE_QUOTES=true
+MARKETDATA_SUBSCRIBE_TRADES=true
+MARKETDATA_SUBSCRIBE_BARS=true
+MARKETDATA_BAR_TIMEFRAME=1Min
+MARKETDATA_BARS_MAX=120
+MARKETDATA_CACHE_TTL_SECONDS=30
+MARKETDATA_CACHE_NAMESPACE=marketdata
+MARKETDATA_WS_URL=
+MARKETDATA_WS_MAX_BACKOFF_SECONDS=30
 FMP_API_KEY=xxx
 FINNHUB_API_KEY=xxx
 BENZINGA_API_KEY=xxx
@@ -70,6 +85,7 @@ GOOGLE_TOKEN_PATH=secrets/token.json
 ```
 说明：`ENGINE_TRAILING_DEFAULT_PERCENT` 与 API 的 `trail_percent` 都是“百分比数值”（2 代表 2%）。
 注意：Alpaca 对碎股 trailing stop 要求 `DAY`，Engine 会在需要时自动覆盖 `GTC`。
+免费版提醒：实时行情 WS 只能用 IEX，且订阅 symbol 通常限制在 ~30 个以内。
 
 ## 跑 FastAPI 服务
 ```bash
@@ -80,6 +96,7 @@ uvicorn apps.api.main:app --reload
 - `GET /health`：心跳。
 - `GET /state/profile`：当前 profile 与环境。
 - `GET /state/positions`：读取持仓快照（来自 Engine + SQLite）。
+- `GET /market-data/*`：读取行情快照（watchlist/quotes/trades/bars）。
 - `POST /commands/*`：下发命令（draft/confirm/kill-switch/trailing-stop）。
 
 ## 跑 Engine
@@ -89,6 +106,12 @@ python -m apps.engine.main
 ```
 说明：Engine 负责 WS + 轮询同步持仓并落库，命令通过 Redis 队列下发。
 买入成交后会自动补挂 trailing stop loss（默认 2%、GTC；碎股自动改为 DAY）。
+
+## 跑 Market Data daemon
+```bash
+source .venv/bin/activate
+python -m apps.marketdata.main
+```
 
 ## 数据库迁移
 ```bash
@@ -121,12 +144,14 @@ docker compose -f deploy/docker-compose.yml --profile live run --rm migrate-live
 docker compose -f deploy/docker-compose.yml --profile live up -d
 ```
 端口：paper API `:8000`、paper UI `:8501`；live API `:8001`、live UI `:8502`。
+提示：Market data daemon 会随 profile 启动，需设置 `MARKETDATA_SYMBOLS`。
 
 ## 执行与状态策略（Current）
 - Engine 独占交易 WS（符合免费版单连接限制）。
 - `trade_updates` 触发即时持仓刷新，轮询保留做最终对账。
 - `ENGINE_SYNC_MIN_INTERVAL_SECONDS` 限制刷新频率，避免打满速率限制。
 - WS 断线后指数退避重连（`ENGINE_TRADING_WS_MAX_BACKOFF_SECONDS`）。
+- Market data daemon 独占行情 WS，把快照写入 Redis。
 - UI 只走 FastAPI，不直连券商。
 
 ## Earnings Calendar CLI（财报/宏观日历）
@@ -171,10 +196,10 @@ earnings-calendar --symbols=AAPL,MSFT --days=60 --export-ics=earnings.ics
 - `make test`：`pytest` 单测 + 轻量集成测试。
 - `make coverage`：覆盖率统计（阈值 80%）。
 改动完建议起码跑 `build` / `lint` / `test` 各一次。
-说明：覆盖率门槛只统计运行时核心模块（`apps/api`、`apps/engine`、`core`、`adapters`、`toolkits`）。
+说明：覆盖率门槛只统计运行时核心模块（`apps/api`、`apps/engine`、`apps/marketdata`、`core`、`adapters`、`toolkits`）。
 
 ## 目录结构速览
-- `apps/`：入口层（api/engine/ui）。
+- `apps/`：入口层（api/engine/marketdata/ui）。
 - `core/`：领域模型与 ports 接口。
 - `adapters/`：外部系统适配器（券商/存储/消息）。
 - `storage/`：数据库迁移与结构化存储。
