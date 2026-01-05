@@ -6,6 +6,9 @@
   - `commands.py` command handling loop
   - `sync.py` position sync loop
   - `streams.py` trading websocket runner
+- `apps/marketdata`: market data daemon (quotes/trades/bars streaming + cache writes).
+  - `main.py` entrypoint + logging
+  - `streams.py` market data websocket runner
 - `apps/ui`: Streamlit dashboard (read-only + command buttons).
   - `main.py` entrypoint + session wiring
   - `api_client.py` FastAPI client
