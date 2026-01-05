@@ -92,6 +92,17 @@ services:
       redis-paper:
         condition: service_healthy
 
+  marketdata-paper:
+    <<: *app-base
+    profiles: ["paper"]
+    env_file:
+      - ./env/common.env
+      - ./env/paper.env
+    command: python -m apps.marketdata.main
+    depends_on:
+      redis-paper:
+        condition: service_healthy
+
   ui-paper:
     <<: *app-base
     profiles: ["paper"]
@@ -155,6 +166,17 @@ services:
     depends_on:
       postgres-live:
         condition: service_healthy
+      redis-live:
+        condition: service_healthy
+
+  marketdata-live:
+    <<: *app-base
+    profiles: ["live"]
+    env_file:
+      - ./env/common.env
+      - ./env/live.env
+    command: python -m apps.marketdata.main
+    depends_on:
       redis-live:
         condition: service_healthy
 
