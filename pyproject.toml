@@ -83,7 +83,7 @@ filterwarnings = ["error::DeprecationWarning"]
 
 [tool.coverage.run]
 branch = true
-source = ["apps.api", "apps.engine", "core", "adapters", "toolkits"]
+source = ["apps.api", "apps.engine", "apps.marketdata", "core", "adapters", "toolkits"]
 omit = ["tests/*", "*/tests/*", ".venv/*"]
 
 [tool.coverage.report]
