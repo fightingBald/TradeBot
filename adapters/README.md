@@ -20,4 +20,6 @@ protection links via SQLAlchemy (SQLite locally, Postgres in Docker Compose).
 
 - Engine uses REST polling for positions plus the Alpaca trading websocket for
   trade updates.
-- UI reads state via FastAPI and does not call the broker directly.
+- Market data streaming runs in a dedicated daemon and writes quotes/trades/bars
+  into Redis via `adapters/market_data/redis_cache.py`.
+- UI reads state and market data via FastAPI and does not call the broker directly.
