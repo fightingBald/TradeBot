@@ -70,6 +70,59 @@ def render_positions(df: pd.DataFrame) -> None:
     st.dataframe(styled, use_container_width=True)
 
 
+def render_market_watch(df: pd.DataFrame) -> None:
+    st.subheader("Market Watch")
+    if df.empty:
+        st.info("No market data available yet.")
+        return
+
+    display_df = df[
+        [
+            "symbol",
+            "last_price",
+            "last_size",
+            "bid_price",
+            "ask_price",
+            "spread",
+            "mid",
+            "trade_time",
+            "quote_time",
+        ]
+    ]
+    styled = display_df.style.format(
+        {
+            "last_price": "${:,.2f}",
+            "last_size": "{:,.2f}",
+            "bid_price": "${:,.2f}",
+            "ask_price": "${:,.2f}",
+            "spread": "${:,.2f}",
+            "mid": "${:,.2f}",
+        }
+    )
+    st.dataframe(styled, use_container_width=True)
+
+
+def render_candles(df: pd.DataFrame, *, symbol: str, timeframe: str) -> None:
+    st.subheader(f"{symbol} {timeframe} Candles")
+    if df.empty:
+        st.info("No bar data available yet.")
+        return
+
+    base = alt.Chart(df).encode(x="timestamp:T")
+    rule = base.mark_rule().encode(y="low:Q", y2="high:Q")
+    color = alt.condition(
+        "datum.close >= datum.open",
+        alt.value("#2ecc71"),
+        alt.value("#e74c3c"),
+    )
+    bar = base.mark_bar().encode(y="open:Q", y2="close:Q", color=color)
+    st.altair_chart(rule + bar, use_container_width=True)
+
+    if "volume" in df.columns:
+        st.caption("Volume")
+        st.bar_chart(df.set_index("timestamp")["volume"])
+
+
 def render_kill_switch(api_base_url: str, profile_id: str, confirm_phrase: str) -> str | None:
     st.header("Kill Switch")
     st.warning("This will cancel open orders and close all positions.")

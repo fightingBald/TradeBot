@@ -5,6 +5,7 @@ from typing import Any
 
 import httpx
 
+from core.domain.market_data import BarSnapshot, QuoteSnapshot, TradeSnapshot
 from core.domain.position import Position
 
 logger = logging.getLogger(__name__)
@@ -46,6 +47,57 @@ def fetch_profile(api_base_url: str, profile_id: str) -> dict[str, str]:
         f"{api_base_url}/state/profile",
         params={"profile_id": profile_id},
     )
+
+
+def fetch_watchlist(api_base_url: str, profile_id: str) -> list[str]:
+    payload = _request_json(
+        "GET",
+        f"{api_base_url}/market-data/watchlist",
+        params={"profile_id": profile_id},
+    )
+    return [str(symbol).upper() for symbol in payload]
+
+
+def fetch_quotes(api_base_url: str, profile_id: str, symbols: list[str]) -> dict[str, QuoteSnapshot]:
+    payload = _request_json(
+        "GET",
+        f"{api_base_url}/market-data/quotes",
+        params={"profile_id": profile_id, "symbols": ",".join(symbols)},
+    )
+    return {symbol: QuoteSnapshot.model_validate(data) for symbol, data in payload.items()}
+
+
+def fetch_trades(api_base_url: str, profile_id: str, symbols: list[str]) -> dict[str, TradeSnapshot]:
+    payload = _request_json(
+        "GET",
+        f"{api_base_url}/market-data/trades",
+        params={"profile_id": profile_id, "symbols": ",".join(symbols)},
+    )
+    return {symbol: TradeSnapshot.model_validate(data) for symbol, data in payload.items()}
+
+
+def fetch_bars(
+    api_base_url: str,
+    profile_id: str,
+    symbols: list[str],
+    *,
+    limit: int,
+    timeframe: str,
+) -> dict[str, list[BarSnapshot]]:
+    payload = _request_json(
+        "GET",
+        f"{api_base_url}/market-data/bars",
+        params={
+            "profile_id": profile_id,
+            "symbols": ",".join(symbols),
+            "limit": str(limit),
+            "timeframe": timeframe,
+        },
+    )
+    results: dict[str, list[BarSnapshot]] = {}
+    for symbol, items in payload.items():
+        results[symbol] = [BarSnapshot.model_validate(item) for item in items]
+    return results
 
 
 def request_kill_switch(
