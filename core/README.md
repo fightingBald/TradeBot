@@ -7,6 +7,7 @@ from adapters or app entry points.
 
 - `BrokerPort`: positions and account-level actions.
 - `MarketDataPort`: latest quote snapshots.
+- `MarketDataCache`: hot cache for live quotes/trades/bars.
 - `StateStore`: persistence for positions and state snapshots.
 - `CommandBus`: command publish/consume interface.
 

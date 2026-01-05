@@ -37,6 +37,21 @@ _KNOWN_ENGINE_ENV_KEYS = {
     "ENGINE_AUTO_PROTECT_ORDER_TYPES",
 }
 
+_KNOWN_MARKETDATA_ENV_KEYS = {
+    "MARKETDATA_STREAM_ENABLED",
+    "MARKETDATA_SYMBOLS",
+    "MARKETDATA_MAX_SYMBOLS",
+    "MARKETDATA_SUBSCRIBE_QUOTES",
+    "MARKETDATA_SUBSCRIBE_TRADES",
+    "MARKETDATA_SUBSCRIBE_BARS",
+    "MARKETDATA_BAR_TIMEFRAME",
+    "MARKETDATA_BARS_MAX",
+    "MARKETDATA_CACHE_TTL_SECONDS",
+    "MARKETDATA_CACHE_NAMESPACE",
+    "MARKETDATA_WS_URL",
+    "MARKETDATA_WS_MAX_BACKOFF_SECONDS",
+}
+
 
 def _warn_unknown_prefixed_env(prefix: str, known_keys: set[str]) -> None:
     unknown = sorted(key for key in os.environ if key.startswith(prefix) and key not in known_keys)
@@ -166,6 +181,59 @@ class Settings(BaseSettings):
         validation_alias=AliasChoices("engine_auto_protect_order_types", "ENGINE_AUTO_PROTECT_ORDER_TYPES"),
     )
 
+    marketdata_stream_enabled: bool = Field(
+        default=True,
+        validation_alias=AliasChoices("marketdata_stream_enabled", "MARKETDATA_STREAM_ENABLED"),
+    )
+    marketdata_symbols: list[str] = Field(
+        default_factory=list,
+        validation_alias=AliasChoices("marketdata_symbols", "MARKETDATA_SYMBOLS"),
+    )
+    marketdata_max_symbols: int = Field(
+        default=30,
+        ge=1,
+        validation_alias=AliasChoices("marketdata_max_symbols", "MARKETDATA_MAX_SYMBOLS"),
+    )
+    marketdata_subscribe_quotes: bool = Field(
+        default=True,
+        validation_alias=AliasChoices("marketdata_subscribe_quotes", "MARKETDATA_SUBSCRIBE_QUOTES"),
+    )
+    marketdata_subscribe_trades: bool = Field(
+        default=True,
+        validation_alias=AliasChoices("marketdata_subscribe_trades", "MARKETDATA_SUBSCRIBE_TRADES"),
+    )
+    marketdata_subscribe_bars: bool = Field(
+        default=True,
+        validation_alias=AliasChoices("marketdata_subscribe_bars", "MARKETDATA_SUBSCRIBE_BARS"),
+    )
+    marketdata_bar_timeframe: str = Field(
+        default="1Min",
+        validation_alias=AliasChoices("marketdata_bar_timeframe", "MARKETDATA_BAR_TIMEFRAME"),
+    )
+    marketdata_bars_max: int = Field(
+        default=120,
+        ge=1,
+        validation_alias=AliasChoices("marketdata_bars_max", "MARKETDATA_BARS_MAX"),
+    )
+    marketdata_cache_ttl_seconds: int = Field(
+        default=30,
+        ge=1,
+        validation_alias=AliasChoices("marketdata_cache_ttl_seconds", "MARKETDATA_CACHE_TTL_SECONDS"),
+    )
+    marketdata_cache_namespace: str = Field(
+        default="marketdata",
+        validation_alias=AliasChoices("marketdata_cache_namespace", "MARKETDATA_CACHE_NAMESPACE"),
+    )
+    marketdata_ws_url: str = Field(
+        default="",
+        validation_alias=AliasChoices("marketdata_ws_url", "MARKETDATA_WS_URL"),
+    )
+    marketdata_ws_max_backoff_seconds: int = Field(
+        default=30,
+        ge=1,
+        validation_alias=AliasChoices("marketdata_ws_max_backoff_seconds", "MARKETDATA_WS_MAX_BACKOFF_SECONDS"),
+    )
+
     @field_validator("data_feed")
     @classmethod
     def _validate_data_feed(cls, value: str) -> str:
@@ -191,6 +259,20 @@ class Settings(BaseSettings):
             return [str(item).strip().lower() for item in value if str(item).strip()]
         return []
 
+    @field_validator("marketdata_symbols", mode="before")
+    @classmethod
+    def _parse_marketdata_symbols(cls, value: object) -> list[str]:
+        if isinstance(value, str):
+            return [item.strip().upper() for item in value.split(",") if item.strip()]
+        if isinstance(value, list):
+            return [str(item).strip().upper() for item in value if str(item).strip()]
+        return []
+
+    @field_validator("marketdata_bar_timeframe", mode="before")
+    @classmethod
+    def _normalize_bar_timeframe(cls, value: str) -> str:
+        return value.strip() if value else "1Min"
+
     @model_validator(mode="after")
     def _apply_defaults_and_warn(self) -> "Settings":
         if "trading_base_url" not in self.model_fields_set:
@@ -215,9 +297,19 @@ class Settings(BaseSettings):
 
         _warn_unknown_prefixed_env("ALPACA_", _KNOWN_ALPACA_ENV_KEYS)
         _warn_unknown_prefixed_env("ENGINE_", _KNOWN_ENGINE_ENV_KEYS)
+        _warn_unknown_prefixed_env("MARKETDATA_", _KNOWN_MARKETDATA_ENV_KEYS)
+
+        if self.marketdata_stream_enabled and not self.marketdata_symbols:
+            logger.warning("Market data stream enabled but MARKETDATA_SYMBOLS is empty")
         return self
 
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", env_prefix="", extra="ignore")
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        env_prefix="",
+        extra="ignore",
+        enable_decoding=False,
+    )
 
 
 @lru_cache
